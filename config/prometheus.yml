@@ -1,0 +1,35 @@
+# Prometheus Configuration for Fraud Detection Platform
+# Scrapes metrics from the FastAPI application
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alertmanager configuration (optional, for future use)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Rule files (optional, for future use)
+rule_files: []
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Fraud Detection API metrics
+  - job_name: 'fraud-api'
+    static_configs:
+      - targets: ['host.docker.internal:9100']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  # Redis metrics (if using redis_exporter)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['host.docker.internal:9121']
+    scrape_interval: 10s

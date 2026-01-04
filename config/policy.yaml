@@ -1,0 +1,91 @@
+version: 1.2.1
+description: Production fraud detection policy - Phase 1 MVP
+default_action: ALLOW
+thresholds:
+  risk:
+    score_type: risk
+    block_threshold: 0.9
+    review_threshold: 0.7
+    friction_threshold: 0.5
+  criminal:
+    score_type: criminal
+    block_threshold: 0.85
+    review_threshold: 0.65
+    friction_threshold: 0.45
+  friendly:
+    score_type: friendly
+    block_threshold: 0.95
+    review_threshold: 0.6
+    friction_threshold: 0.4
+rules:
+- id: emulator_block
+  name: Emulator Block
+  description: Block transactions from emulated devices
+  enabled: true
+  priority: 10
+  conditions:
+    device_is_emulator: true
+  action: BLOCK
+  friction_type: null
+  review_priority: null
+- id: tor_block
+  name: Tor Block
+  description: Block transactions from Tor exit nodes
+  enabled: true
+  priority: 15
+  conditions:
+    ip_is_tor: true
+  action: BLOCK
+  friction_type: null
+  review_priority: null
+- id: datacenter_review
+  name: Datacenter Review
+  description: Review transactions from datacenter IPs
+  enabled: true
+  priority: 20
+  conditions:
+    ip_is_datacenter: true
+  action: REVIEW
+  friction_type: null
+  review_priority: HIGH
+- id: high_value_new_account
+  name: High Value New Account
+  description: Require 3DS for high-value transactions from new accounts
+  enabled: true
+  priority: 50
+  conditions:
+    user_is_new: true
+    amount_cents_gte: 100000
+  action: FRICTION
+  friction_type: 3DS
+  review_priority: null
+- id: high_value_new_card
+  name: High Value New Card
+  description: Require 3DS for high-value transactions with first-seen card
+  enabled: true
+  priority: 55
+  conditions:
+    card_is_new: true
+    amount_cents_gte: 50000
+  action: FRICTION
+  friction_type: 3DS
+  review_priority: null
+- id: rooted_high_value
+  name: Rooted Device High Value
+  description: Review high-value transactions from rooted devices
+  enabled: true
+  priority: 60
+  conditions:
+    amount_cents_gte: 25000
+    device_is_rooted: true
+  action: REVIEW
+  friction_type: null
+  review_priority: MEDIUM
+blocklist_cards:
+- card_fraudster_123
+blocklist_devices: []
+blocklist_ips: []
+blocklist_users: []
+allowlist_cards: []
+allowlist_users: []
+allowlist_merchants: []

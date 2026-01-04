@@ -1,0 +1,378 @@
+# **MASTER PROMPT — Payment & Chargeback Fraud Platform (Principal‑Level, Production‑Grade)**
+
+***
+
+## **Role**
+
+Act as a **Chief Data Architect & Senior Fraud Strategy Lead** with 15+ years of hands‑on experience operating high‑velocity global payment platforms and enterprise fraud systems.  
+You design systems that survive real attackers, regulatory scrutiny, business pressure, and production failure.
+
+Your responses MUST favor **depth over breadth**. When in doubt, choose **concrete, implementation‑level detail** (schemas, feature definitions, pseudo‑code, data flows, operational workflows) over high‑level abstractions.
+
+If the response becomes too long for a single message, **continue in subsequent messages without skipping any section**.
+
+***
+
+## **Context & Strategic Roadmap**
+
+I am building a comprehensive **Telecom / MSP Fraud Detection Platform**.
+
+- **Phase 1 (Build Now):**  
+  **Payment & Chargeback Fraud — Real‑Time Streaming & Decisioning**
+
+- **Phase 2 (Later):**  
+  IRSF, ATO, Subscription Fraud, Batch & Long‑Horizon Analytics
+
+For this prompt, focus on **Phase 1**, but design the platform so it can later ingest and leverage **non‑payment signals** (usage, ATO, SIM events, subscription data) and **ecosystem signals** (3DS results, issuer/network alerts, consortium scores).
+
+When making Sprint‑1 design choices, **favor a minimal viable production design for a narrow, end‑to‑end slice** (ingestion → features → scoring → policy → evidence), and explicitly defer non‑essential components to later phases. “Minimal” must still be **production‑ready** for this slice (monitorable, testable, operable).
+
+***
+	
+## **Critical Philosophy: Practitioner Constraints**
+
+You must obey these realities and reflect them concretely in the architecture and Sprint‑1 plan.
+
+1. **Net Revenue Optimization, Not Just Fraud Blocking**  
+   The platform must explicitly optimize:
+
+   \[
+   \text{Expected Financial Loss} = P(\text{chargeback}) \times (\text{transaction amount} + \text{fees} + \text{penalties} + \text{operational cost})
+   \]
+
+   - Show how this cost function is computed from data.  
+   - Show how it is used to tune thresholds and policies in practice (who adjusts it, how often, via what interface).
+
+2. **Policy Engine > ML Models**  
+   ML produces signals. **Policy decides money.**  
+   - Architect a **clean separation** between:  
+     - Model scoring (stateless, feature‑in → score‑out), and  
+     - Policy decisions (business‑configurable logic, thresholds, overrides, experiments).  
+   - Policies MUST be tunable without redeploying models (configuration/UI, not code changes).
+
+3. **Friendly Fraud vs Criminal vs Merchant Error**  
+   A large share of chargebacks is first‑party abuse or merchant error.  
+   The system MUST maintain separate logic and response strategies for:
+
+   - **Criminal fraud** (stolen cards, bots, organized rings)  
+   - **Friendly fraud** (customer abuse, disputes, refund gaming)  
+   - **Merchant error / ops error** (descriptor issues, fulfillment problems)
+
+   You MUST define a **label taxonomy** and explain:
+
+   - How each class is labeled from chargeback/dispute data and internal signals.  
+   - How each class influences models and policies differently (e.g., criminal → blocks/blacklists; friendly → friction/soft‑deny/refund logic; merchant error → CX/process fixes rather than tighter models).
+
+4. **Evidence Is a Revenue Product**  
+   Evidence must be captured **at transaction time**, structured for dispute automation, and fed back into learning loops.
+
+   - Define the **evidence schema** (fields, formats, IDs).  
+   - Show how evidence is linked to later disputes and used for representment and model training.  
+   - Ensure the design respects governance and retention requirements.
+
+5. **Velocity Beats Sophistication**  
+   Most loss occurs in the first 30–90 minutes of an attack.
+
+   - Prioritize streaming detection, velocity counters, and rapid response over complex models.  
+   - Give concrete examples of velocity features and rate limits (per card/device/IP/account/merchant).  
+   - Show where these counters live and how they are updated.
+
+6. **Adversarial & Failure‑Resilient Design**
+
+   The system must assume:
+
+   - Active probing and threshold gaming  
+   - Data poisoning attempts  
+   - Partial outages, model failure, and rollback scenarios  
+
+   You MUST describe:
+
+   - How to detect probing/threshold‑gaming patterns in event data.  
+   - How to randomize or rotate policies/thresholds safely.  
+   - How the system behaves in **safe mode** when models or upstream dependencies fail (fallback rules, default decisions, degradations).
+
+7. **Economic Optimization Loop Is Mandatory**
+
+   The platform must include:
+
+   - Cost functions and **explicit business metrics**  
+   - Profit‑based threshold tuning  
+   - Approval‑rate vs loss trade curves  
+   - Business‑controlled risk budgets  
+
+   You MUST explain:
+
+   - Data needed to estimate these curves (historical decisions, outcomes, chargebacks, disputes).  
+   - Offline simulation/what‑if approach (e.g., re‑scoring history with alternative thresholds).  
+   - How non‑technical stakeholders (fraud, product, finance) adjust risk thresholds and budgets (UI, config, process).
+
+8. **Model Lifecycle Discipline**
+
+   You must design for:
+
+   - Champion/challenger models and A/B traffic routing  
+   - Feature & concept drift detection (what to monitor, where, and how often)  
+   - Fallback behavior when a challenger underperforms  
+   - Continuous retraining strategy (data windows, label lags, retrain cadence)
+
+   Provide **concrete**:
+
+   - Monitoring metrics and alerts.  
+   - Data pipelines for training sets (including label lag due to delayed chargebacks).  
+   - Rollout/rollback flows.
+
+9. **Governance & PCI/PII Boundaries**
+
+   Architecture must explicitly address:
+
+   - PII handling and minimal exposure  
+   - PCI boundaries and tokenization strategy (where raw PAN lives, if at all)  
+   - Evidence immutability & retention windows  
+   - Auditability & regulatory controls (who changed what policy when)
+
+   Be explicit about **boundary patterns**:
+
+   - Where the fraud platform sits relative to PCI scope.  
+   - What identifiers it sees (tokens vs raw PAN).  
+   - How masking/redaction works in logs and analytics.
+
+10. **Ecosystem & Multi‑Signal Context**
+
+    - The platform must integrate **external signals** (3DS results, issuer/network alerts, consortium scores) and treat them as first‑class features in models and policy.  
+    - The design must anticipate **non‑payment telco/MSP signals** (usage patterns, ATO/SIM events, subscription risk signals) and show *where* they join the payment risk pipeline, even if not implemented in Sprint‑1.
+
+***
+
+## **Objectives**
+
+### **1. Design the Full Architecture**
+
+A unified fraud platform that handles:
+
+- Real‑time transaction decisioning  
+- Post‑transaction dispute & evidence management  
+- Economic optimization & business control  
+- Adversarial & failure‑resilient operations  
+- Multi‑signal scoring (payments + telco/MSP + ecosystem signals)  
+- Governance, PCI/PII boundaries, and auditability  
+
+Architecture may stay high‑level **only** for clearly marked future/Phase‑2 extensions. For all **Phase‑1 components**, you MUST go into implementation‑level detail.
+
+### **2. Produce Sprint‑1 Implementation Plan (Depth Required)**
+
+Provide detailed, *code‑adjacent* technical steps **strictly for Phase‑1 (Payment & Chargeback Fraud)**, including:
+
+- Concrete data schemas  
+- Entity and feature definitions  
+- Pseudo‑code for streaming logic, risk scoring, and policy evaluation  
+- Example configs and API contracts  
+
+A senior engineer should be able to start implementing from your answer without major design gaps.
+
+***
+
+## **Required Output Structure**
+
+You MUST follow this structure and provide **deep, actionable detail** in each section.
+
+### **1. Battle‑Hardened Technology Stack**
+
+**Table:**
+
+| Component | Technology Choice | Why (Mapped to Practitioner Constraints) |
+
+Must explicitly include and justify:
+
+- **Policy / Rules Engine**  
+  - Separate from ML serving; how configured, updated, versioned, and rolled back.  
+- **Evidence Vault**  
+  - Immutable, compliant, dispute‑ready; data model, storage technology, retention strategy.  
+- **Feature Platform**  
+  - Stream + batch; entity profiles for user/device/card/account/IP/merchant; how features are computed and served.  
+- **Model Lifecycle Management**  
+  - Training pipelines, registry, deployment, champion/challenger routing.  
+- **Economic Optimization Service**  
+  - Where it runs, what data it uses, and how it exposes recommendations/threshold updates to policy.  
+- **Governance & Compliance Controls**  
+  - PII/PCI boundaries, audit logs, configuration history, access controls.
+
+For each row, tie the technology choice to specific constraints (latency, net revenue, governance, adversaries), not just generic pros/cons.
+
+***
+
+### **2. Architecture Diagram Description (With Concrete Flows)**
+
+Use this base flow:
+
+```text
+Payment Webhook
+→ Ingestion
+→ Event Normalization & Idempotency Handling
+→ Feature Enrichment (Entity Profiles, External Signals, Telco/MSP Context Hooks)
+→ Risk Models
+→ POLICY ENGINE
+→ Decision (Allow / Friction / Review / Block)
+→ Evidence Vault
+```
+
+You MUST describe:
+
+1. **Event & Idempotency Design**
+
+   - Define event types (e.g., auth, capture, refund, chargeback, dispute outcome).  
+   - Define idempotency keys and how duplicate events and out‑of‑order events are handled.  
+   - Explain how you achieve “exactly‑once business effects” despite retries and out‑of‑order delivery.
+
+2. **Feedback Loop & Label Hygiene**
+
+   - Describe how chargeback/dispute data is ingested, cleaned, and mapped into the label taxonomy (criminal vs friendly vs merchant error).  
+   - Explain how partial chargebacks, representment outcomes, and network/issuer reason codes are normalized.  
+   - Show which subsets are valid fraud labels for training, and which are excluded or treated separately.
+
+3. **Dispute Outcome Learning Pipeline**
+
+   - Show how dispute outcomes and win/loss data flow back into:  
+     - Models (features and labels).  
+     - Policy rules (e.g., “this evidence type yields higher win rates”).  
+   - Include how evidence and disputes are joined and written into training datasets.
+
+4. **Model Update & Rollback Paths**
+
+   - Describe the full path: training → validation → offline replay testing → A/B testing → rollout → monitoring → rollback criteria and mechanism.  
+   - Include how you handle label lag and concept drift.
+
+5. **Failure & Attack Response Controls**
+
+   - Show how the system detects probing/threshold‑gaming patterns.  
+   - Show safe‑mode behavior when models or upstreams fail (what decisions are made, with what defaults).  
+   - Show how thresholds/policies can be rotated without breaking monitoring or business metrics.
+
+***
+
+### **3. External Entities & Prerequisites (Sprint‑1 Scope)**
+
+List and describe concrete setup steps for:
+
+- **Entity profiling** (user, device, card, account, IP, merchant)  
+  - What storage (e.g., Redis or similar) holds which aggregates; key structure; TTLs.  
+- **BIN / issuer / network intelligence feeds**  
+  - Data sources, update cadence, schema, and how those fields are used in features and policy.  
+- **PII & compliance boundaries**  
+  - Tokenization approach; which services can see what; masking/redaction in logs and analytics.  
+- **Dispute network integration**  
+  - Mechanism for receiving issuer/network alerts/reports (APIs/files), mapping them to internal transactions, and feeding them to models and ops tools.
+
+Be concrete: name example tables/streams, keys, and minimal schemas.
+
+***
+
+### **4. Step‑by‑Step Implementation Plan — Sprint 1 (Payment & Chargeback Only, In Depth)**
+
+For Sprint‑1, provide a **detailed, implementation‑level plan**. For each step, include data structures, pseudo‑code, and example configs where appropriate.
+
+**Step 1 — Infra & Environment**
+
+- Define how to stand up: streaming infrastructure (e.g., Kafka‑like), stream processing (e.g., Flink/Beam‑like), fast store (e.g., Redis‑like), Feature Store, Policy Service, Evidence Vault, and Model Service.  
+- Include:  
+  - Service boundaries and APIs.  
+  - Topics/stream names.  
+  - A minimal deployment topology (conceptual is fine).
+
+**Step 2 — Streaming Ingestion, Normalization & Entity Features**
+
+- Define the canonical **PaymentEvent** schema (fields, IDs, timestamps, idempotency key, links to external signals).  
+- Show how events are normalized from raw webhooks/PSP events.  
+- Define **entity‑centric features** for user/device/card/IP/account/merchant, including exact formulas and sliding windows, for example:  
+  - `device_distinct_cards_1h`  
+  - `card_attempts_10m`  
+  - `user_dispute_rate_90d`  
+  - `refund_velocity_7d`  
+- Provide pseudo‑code (or clear algorithmic descriptions) for maintaining these aggregates in a streaming job.
+
+**Step 3 — Friendly vs Criminal Detection Logic**
+
+- **Criminal fraud:**  
+  - Pseudo‑code for detecting card testing / BIN attacks based on velocity and patterns across card, device, IP, merchant, and BIN/issuer data.  
+- **Friendly fraud:**  
+  - Pseudo‑code for scoring historical abuse and dispute behavior, using:  
+    - Past chargebacks and dispute outcomes.  
+    - Refund patterns.  
+    - Usage/behavior consistency (where available).  
+- Explicitly state how the label taxonomy feeds these two tracks and how they are exposed (e.g., separate scores, tags, risk dimensions).
+
+**Step 4 — Policy Engine & Economic Controls**
+
+- Design the **policy configuration model** (e.g., JSON/YAML rules, DB tables) with examples of tiered decisions:  
+  - Allow  
+  - Friction (3DS / MFA / step‑up)  
+  - Manual review  
+  - Hard block  
+- Show how the policy engine:  
+  - Consumes scores, features, and external signals.  
+  - Applies **profit‑based thresholds** (using the cost function) rather than naive score cutoffs.  
+  - Supports champion/challenger policies and experiments.  
+  - Exposes controls to business users (e.g., simple config UI or structured config files).
+
+**Step 5 — Evidence Capture & Dispute Pipeline**
+
+- Provide a **code‑level example** (pseudo‑code is fine) for capturing and serializing transaction context (IP, device ID, AVS/CVV/3DS, user profile, key features, policy decision) to immutable storage.  
+- Define IDs that link:  
+  - Payment → Evidence → Chargeback → Dispute outcome → Model training row.  
+- Describe the batch or streaming process that:  
+  - Joins disputes back to original evidence.  
+  - Writes labeled examples into training datasets and analytics tables.
+
+***
+
+### **5. Testing, Validation & Readiness (Mandatory)**
+
+You MUST explicitly include:
+
+#### **1. Offline Validation & Replay Testing**
+
+- How historical data is replayed through the pipeline (from PaymentEvent to decision).  
+- How alternative thresholds and policies are simulated on this history.  
+- How economic impact (loss, approval, LTV proxies) is measured before rollout.
+
+#### **2. Pre‑Production Acceptance Criteria**
+
+Define concrete go/no‑go checks for Sprint‑1, including:
+
+- Latency targets verified under representative load.  
+- Idempotency and ordering correctness (no duplicate or missing business effects).  
+- Accuracy and stability of key features (e.g., velocity counters behave as expected).  
+- No unacceptable regression on approval rate vs fraud loss compared to baseline.
+
+#### **3. Production Monitoring & Early‑Warning Signals**
+
+Define what is monitored from day one:
+
+- Feature drift and data quality  
+- Model decay and performance  
+- Policy impact on revenue and customer experience  
+- Fraud campaign emergence (spikes, new patterns)  
+- System health & fallback triggers
+
+Include example alert thresholds, dashboards, and escalation paths.
+
+***
+
+## **Non‑Negotiable Constraints**
+
+- **Latency:** < 200 ms end‑to‑end for online decisioning.  
+  - You MUST explain where synchronous vs asynchronous work happens to meet this.
+
+- **Idempotency:** Exactly‑once **business effects**.  
+  - You MUST show how you handle:  
+    - Duplicate webhooks.  
+    - Out‑of‑order auth/capture/refund/chargeback events.
+
+- **Primary KPIs:**
+
+  - Net fraud loss rate (including fees and ops cost)  
+  - Approval rate  
+  - False positive rate  
+  - Dispute win rate  
+  - Customer LTV / churn impact
+
+These metrics MUST be surfaced in the architecture (where they are computed, stored, and surfaced) and explicitly tied into the economic optimization loop.

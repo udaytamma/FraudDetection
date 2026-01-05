@@ -1,17 +1,17 @@
-version: 1.2.1
+version: 1.2.3
 description: Production fraud detection policy - Phase 1 MVP
 default_action: ALLOW
 thresholds:
   risk:
     score_type: risk
-    block_threshold: 0.9
-    review_threshold: 0.7
-    friction_threshold: 0.5
+    block_threshold: 0.85
+    review_threshold: 0.6
+    friction_threshold: 0.35
   criminal:
     score_type: criminal
     block_threshold: 0.85
     review_threshold: 0.65
-    friction_threshold: 0.45
+    friction_threshold: 0.4
   friendly:
     score_type: friendly
     block_threshold: 0.95

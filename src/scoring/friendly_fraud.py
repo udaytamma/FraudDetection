@@ -1,11 +1,17 @@
 """
-Friendly Fraud Scoring
+Friendly Fraud Scoring - Telco/MSP Payment Fraud
 
 Scores risk of friendly fraud (first-party abuse):
-1. Customer disputes legitimate transactions
-2. Refund gaming / abuse
-3. Subscription abuse
-4. "Buyer's remorse" chargebacks
+1. Subscriber disputes legitimate service charges
+2. Service cancellation after device receipt (device upgrade fraud)
+3. Subscription abuse (sign up, use, chargeback)
+4. "Buyer's remorse" chargebacks after equipment purchase
+
+Telco-specific patterns:
+- Device upgrade, receive phone, then chargeback
+- Equipment purchase with subsequent dispute
+- Service activation followed by immediate cancellation
+- International roaming usage then dispute
 
 Key signals:
 - Historical chargeback rate
@@ -23,9 +29,14 @@ class FriendlyFraudScorer:
     Scores friendly fraud risk.
 
     Friendly fraud requires different treatment than criminal fraud:
-    - Often from legitimate customers
+    - Often from legitimate subscribers
     - Response is friction/limits rather than blocks
     - Evidence is critical for representment
+
+    In telco context, common patterns include:
+    - Device upgrade fraud: receive subsidized device, then dispute
+    - Equipment fraud: receive CPE/modem, then chargeback
+    - Service abuse: use service (roaming, data), then dispute
     """
 
     def __init__(
@@ -160,14 +171,16 @@ class FriendlyFraudScorer:
             )
 
         # =======================================================================
-        # Check 7: Guest checkout for high value
+        # Check 7: Guest/new subscriber for high value (device upgrade, equipment)
+        # Telco context: New subscriber getting subsidized device is high risk
         # =======================================================================
         if features.entity.user_is_guest and event.amount_cents >= 50000:  # $500
-            # Guest checkout for high value is higher risk for friendly fraud
+            # Guest/new subscriber for high value is higher risk for friendly fraud
+            # In telco: device upgrades, equipment purchases from new accounts
             signals.append(0.4)
             result.add_reason(
                 code="GUEST_HIGH_VALUE",
-                description=f"Guest checkout for ${event.amount_cents/100:.2f}",
+                description=f"Guest/new subscriber for ${event.amount_cents/100:.2f}",
                 severity="MEDIUM",
                 value=f"${event.amount_cents/100:.2f}",
             )
@@ -187,9 +200,14 @@ class SubscriptionAbuseScorer:
     Scores risk of subscription abuse.
 
     Patterns:
-    - Sign up, use, chargeback
-    - Multiple free trials
+    - Sign up, use service, chargeback
+    - Multiple free trials / promotional abuse
     - Payment method cycling
+
+    Telco-specific patterns:
+    - Multiple new line promotions from same household
+    - Service activation with immediate high usage then dispute
+    - International roaming enable, use, then chargeback
     """
 
     async def score(

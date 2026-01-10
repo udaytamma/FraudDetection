@@ -128,10 +128,10 @@ class PolicyEngine:
             ))
             return Decision.ALLOW, reasons, None, None
 
-        if event.merchant_id in self.policy.allowlist_merchants:
+        if event.service_id in self.policy.allowlist_services:
             reasons.append(DecisionReason(
-                code=ReasonCodes.ALLOWLIST_MERCHANT,
-                description="Merchant is on allowlist",
+                code=ReasonCodes.ALLOWLIST_SERVICE,
+                description="Service is on allowlist",
                 severity="LOW",
             ))
             return Decision.ALLOW, reasons, None, None

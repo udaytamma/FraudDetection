@@ -1,5 +1,5 @@
 """
-Decision Schemas
+Decision Schemas for Telco/MSP Payment Fraud Detection
 
 Defines the decision types and response structures for the
 fraud detection API. Decisions follow a hierarchy:
@@ -20,7 +20,7 @@ def _utc_now() -> datetime:
 
 class Decision(str, Enum):
     """
-    Fraud decision outcomes.
+    Payment fraud decision outcomes.
 
     Ordered by severity (ALLOW is least severe, BLOCK is most severe):
     - ALLOW: Proceed with transaction (revenue captured, fraud risk accepted)
@@ -36,7 +36,7 @@ class Decision(str, Enum):
 
 class DecisionReason(BaseModel):
     """
-    Reason for a fraud decision.
+    Reason for a payment fraud decision.
 
     Provides transparency into why a decision was made.
     Used for:
@@ -73,7 +73,7 @@ class DecisionReason(BaseModel):
 
 class RiskScores(BaseModel):
     """
-    Risk scores computed by the scoring engine.
+    Risk scores computed by the scoring engine for payment fraud detection.
 
     Separate scores for different fraud types allow
     for tailored policy responses.
@@ -83,7 +83,7 @@ class RiskScores(BaseModel):
         ...,
         ge=0.0,
         le=1.0,
-        description="Overall fraud risk score",
+        description="Overall payment fraud risk score",
     )
 
     # Component scores
@@ -91,7 +91,7 @@ class RiskScores(BaseModel):
         default=0.0,
         ge=0.0,
         le=1.0,
-        description="Criminal fraud risk score (stolen cards, bots, fraud rings)",
+        description="Criminal payment fraud risk score (stolen cards, bots, fraud rings)",
     )
     friendly_fraud_score: float = Field(
         default=0.0,
@@ -137,7 +137,7 @@ class RiskScores(BaseModel):
 
 class FraudDecisionResponse(BaseModel):
     """
-    Complete fraud decision response.
+    Complete payment fraud decision response.
 
     Returned by the /decide endpoint with full context for:
     - Transaction processing (decision)
@@ -157,7 +157,7 @@ class FraudDecisionResponse(BaseModel):
     # Decision
     decision: Decision = Field(
         ...,
-        description="Fraud decision",
+        description="Payment fraud decision",
     )
     reasons: list[DecisionReason] = Field(
         default_factory=list,
@@ -231,7 +231,7 @@ class FraudDecisionResponse(BaseModel):
 
 class ReasonCodes:
     """
-    Standard reason codes for fraud decisions.
+    Standard reason codes for payment fraud decisions.
 
     Format: {CATEGORY}_{SUBCATEGORY}_{DETAIL}
     """
@@ -246,6 +246,12 @@ class ReasonCodes:
     VELOCITY_DEVICE_CARDS = "VELOCITY_DEVICE_CARDS"
     VELOCITY_IP_CARDS = "VELOCITY_IP_CARDS"
     VELOCITY_USER_24H = "VELOCITY_USER_24H"
+
+    # Telco-Specific Velocity
+    VELOCITY_SIM_FARM = "VELOCITY_SIM_FARM"
+    VELOCITY_DEVICE_RESALE = "VELOCITY_DEVICE_RESALE"
+    VELOCITY_EQUIPMENT_FRAUD = "VELOCITY_EQUIPMENT_FRAUD"
+    VELOCITY_PROMO_STACKING = "VELOCITY_PROMO_STACKING"
 
     # Geographic
     GEO_IMPOSSIBLE_TRAVEL = "GEO_IMPOSSIBLE_TRAVEL"
@@ -269,6 +275,12 @@ class ReasonCodes:
     HIGH_VALUE_NEW_CARD = "HIGH_VALUE_NEW_CARD"
     HIGH_VALUE_RISK_SCORE = "HIGH_VALUE_RISK_SCORE"
 
+    # High Risk Service Types
+    HIGH_RISK_DEVICE_UPGRADE = "HIGH_RISK_DEVICE_UPGRADE"
+    HIGH_RISK_SIM_SWAP = "HIGH_RISK_SIM_SWAP"
+    HIGH_RISK_INTERNATIONAL = "HIGH_RISK_INTERNATIONAL"
+    HIGH_RISK_EQUIPMENT = "HIGH_RISK_EQUIPMENT"
+
     # Verification
     VERIFICATION_AVS_MISMATCH = "VERIFICATION_AVS_MISMATCH"
     VERIFICATION_CVV_MISMATCH = "VERIFICATION_CVV_MISMATCH"
@@ -279,8 +291,10 @@ class ReasonCodes:
     BLOCKLIST_DEVICE = "BLOCKLIST_DEVICE"
     BLOCKLIST_IP = "BLOCKLIST_IP"
     BLOCKLIST_USER = "BLOCKLIST_USER"
+    BLOCKLIST_PHONE = "BLOCKLIST_PHONE"
+    BLOCKLIST_IMEI = "BLOCKLIST_IMEI"
 
     # Allowlist
     ALLOWLIST_CARD = "ALLOWLIST_CARD"
     ALLOWLIST_USER = "ALLOWLIST_USER"
-    ALLOWLIST_MERCHANT = "ALLOWLIST_MERCHANT"
+    ALLOWLIST_SERVICE = "ALLOWLIST_SERVICE"

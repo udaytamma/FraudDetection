@@ -1,15 +1,20 @@
 """
-Card Testing Detection
+Card Testing Detection - Telco/MSP Payment Fraud
 
 Detects card testing/enumeration attacks where fraudsters:
-1. Test stolen cards with small transactions
+1. Test stolen cards with small service activations (SIM, topup)
 2. Probe multiple cards rapidly to find working ones
 3. Use sequential or patterned card numbers (BIN attacks)
+
+Telco-specific patterns:
+- Rapid SIM activations with same card (SIM farm setup)
+- Multiple prepaid topups to test card validity
+- Small service purchases before high-value device upgrade
 
 Key signals:
 - High velocity of attempts on same card
 - High decline rate on card
-- Small transaction amounts ($1-5)
+- Small transaction amounts ($1-5 topups, cheap SIM activations)
 - Multiple cards from same device/IP in short time
 """
 
@@ -23,9 +28,14 @@ class CardTestingDetector(BaseDetector):
     Detects card testing and BIN enumeration attacks.
 
     Card testing is characterized by:
-    - Rapid succession of small transactions
+    - Rapid succession of small service activations (SIM, topup)
     - High decline rate as fraudsters probe for valid cards
     - Often from single device/IP hitting many cards
+
+    In telco context, common patterns include:
+    - Multiple SIM activations from same card (SIM farm setup)
+    - Small prepaid topups to validate stolen cards
+    - Testing before high-value device upgrade fraud
     """
 
     def __init__(
@@ -95,11 +105,13 @@ class CardTestingDetector(BaseDetector):
 
         # =======================================================================
         # Check 3: Small amount + velocity pattern
+        # Telco context: small topups, cheap SIM activations used for testing
         # =======================================================================
         is_small_amount = event.amount_cents <= self.small_amount_threshold
 
         if is_small_amount and card_attempts >= 2:
             # Small amounts with velocity = likely testing
+            # Common in prepaid topup fraud and SIM activation testing
             signals.append(0.6)
             result.add_reason(
                 code=ReasonCodes.CARD_TESTING_SMALL_AMOUNTS,

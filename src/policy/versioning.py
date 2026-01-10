@@ -85,7 +85,7 @@ class ListUpdate(BaseModel):
     def validate_list_type(cls, v):
         valid_types = [
             'blocklist_cards', 'blocklist_devices', 'blocklist_ips', 'blocklist_users',
-            'allowlist_cards', 'allowlist_users', 'allowlist_merchants'
+            'allowlist_cards', 'allowlist_users', 'allowlist_services'
         ]
         if v not in valid_types:
             raise ValueError(f'list_type must be one of: {valid_types}')
@@ -299,7 +299,7 @@ class PolicyVersioningService:
         # Convert sets to lists for YAML
         for key in ['blocklist_cards', 'blocklist_devices', 'blocklist_ips',
                     'blocklist_users', 'allowlist_cards', 'allowlist_users',
-                    'allowlist_merchants']:
+                    'allowlist_services']:
             if key in policy_dict and isinstance(policy_dict[key], list):
                 policy_dict[key] = list(policy_dict[key])
 

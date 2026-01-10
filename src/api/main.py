@@ -630,7 +630,7 @@ async def diff_policy_versions(version1: str, version2: str):
     # Compare lists
     for list_name in ['blocklist_cards', 'blocklist_devices', 'blocklist_ips',
                       'blocklist_users', 'allowlist_cards', 'allowlist_users',
-                      'allowlist_merchants']:
+                      'allowlist_services']:
         l1 = set(v1.policy_content.get(list_name, []))
         l2 = set(v2.policy_content.get(list_name, []))
         added = l2 - l1

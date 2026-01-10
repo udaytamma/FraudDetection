@@ -1,16 +1,22 @@
 """
-Velocity Attack Detection
+Velocity Attack Detection - Telco/MSP Payment Fraud
 
 Detects abnormal transaction velocity patterns that indicate:
 1. Stolen card being used rapidly before block
-2. Account takeover with rapid purchases
-3. Fraud rings hitting a merchant
-4. Automated fraud using bots
+2. Account takeover with rapid service activations
+3. Fraud rings hitting a service provider
+4. Automated fraud using bots (SIM farm operations)
+
+Telco-specific patterns:
+- Rapid SIM activations (SIM farm setup)
+- Multiple device upgrades in short time (resale fraud)
+- Equipment purchases across accounts (CPE resale)
+- Multiple international roaming enables (IRSF setup)
 
 Key signals:
 - Transaction count exceeds normal patterns
 - Amount velocity exceeds limits
-- Distinct entity counts (cards per device, merchants per card)
+- Distinct entity counts (cards per device, accounts per card)
 """
 
 from ..config import settings
@@ -24,8 +30,14 @@ class VelocityAttackDetector(BaseDetector):
 
     Velocity attacks are characterized by:
     - High transaction frequency from single entity
-    - Unusual patterns (many merchants, many cards, etc.)
+    - Unusual patterns (many accounts, many cards, etc.)
     - Amount accumulation exceeding normal limits
+
+    In telco context:
+    - SIM farm detection: same card, many phone numbers
+    - Device resale fraud: same card, many IMEIs
+    - Equipment fraud: same card, many modem MACs
+    - Promo stacking: same address, many accounts
     """
 
     def __init__(
@@ -155,19 +167,21 @@ class VelocityAttackDetector(BaseDetector):
             )
 
         # =======================================================================
-        # Check 6: Card spreading across many merchants
+        # Check 6: Card spreading across many subscriber accounts
+        # Telco context: Same card used for multiple subscriber accounts
+        # indicates potential promo abuse or SIM farm setup
         # =======================================================================
-        card_merchants = features.velocity.card_distinct_merchants_24h
+        card_accounts = features.velocity.card_distinct_accounts_24h
 
-        if card_merchants >= 10:
-            score = min(1.0, card_merchants / 20)
+        if card_accounts >= 10:
+            score = min(1.0, card_accounts / 20)
             signals.append(score * 0.5)
 
             result.add_reason(
-                code="VELOCITY_CARD_MERCHANTS",
-                description=f"Card used at {card_merchants} merchants in 24 hours",
+                code="VELOCITY_CARD_ACCOUNTS",
+                description=f"Card used for {card_accounts} subscriber accounts in 24 hours",
                 severity="MEDIUM",
-                value=str(card_merchants),
+                value=str(card_accounts),
                 threshold="10",
             )
 

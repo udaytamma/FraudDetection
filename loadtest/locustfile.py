@@ -1,8 +1,8 @@
 """
-Fraud Detection Load Test Suite
+Telco/MSP Payment Fraud Detection Load Test Suite
 
 Locust-based load testing for the fraud detection API.
-Supports realistic traffic patterns, fraud injection, and various test scenarios.
+Supports realistic telco traffic patterns, fraud injection, and various test scenarios.
 
 Usage:
     locust -f locustfile.py --host=http://localhost:8000
@@ -20,23 +20,26 @@ from locust.runners import MasterRunner
 from data_generator import (
     generate_transaction,
     generate_card_testing_transaction,
+    generate_sim_farm_transaction,
+    generate_device_resale_transaction,
+    generate_equipment_fraud_transaction,
     generate_fraud_ring_transaction,
     generate_geo_anomaly_transaction,
-    generate_high_value_new_user_transaction,
+    generate_high_value_new_subscriber_transaction,
     TRAFFIC_MIX,
 )
 
 
 class FraudDetectionUser(HttpUser):
     """
-    Simulates a payment processor sending transactions for fraud decisions.
+    Simulates a telco payment processor sending transactions for fraud decisions.
 
-    Traffic mix:
-    - 95% legitimate transactions
-    - 2% card testing attacks
-    - 1% fraud ring patterns
-    - 1% geo anomaly
-    - 1% high-value new user
+    Traffic mix (telco context):
+    - 95% legitimate transactions (SIM activations, topups, service changes)
+    - 2% card testing attacks (small topups to validate stolen cards)
+    - 1% fraud ring patterns (same device, multiple subscriber accounts)
+    - 1% geo anomaly (service activation from unexpected location)
+    - 1% high-value new subscriber (device upgrade from new account)
     """
 
     # Wait 100-500ms between requests (simulates realistic traffic)
@@ -58,7 +61,7 @@ class FraudDetectionUser(HttpUser):
     def card_testing_attack(self):
         """
         Card testing attack pattern - 2% of traffic.
-        Same card, rapid small transactions.
+        Same card, rapid small topups to test card validity.
         """
         payload = generate_card_testing_transaction()
         self._send_decision_request(payload, "card_testing")
@@ -67,7 +70,7 @@ class FraudDetectionUser(HttpUser):
     def fraud_ring_pattern(self):
         """
         Fraud ring pattern - 1% of traffic.
-        Same device, different cards.
+        Same device, multiple subscriber accounts.
         """
         payload = generate_fraud_ring_transaction()
         self._send_decision_request(payload, "fraud_ring")
@@ -76,19 +79,19 @@ class FraudDetectionUser(HttpUser):
     def geo_anomaly_pattern(self):
         """
         Geographic anomaly - 1% of traffic.
-        Transaction from unexpected location.
+        Service activation from unexpected location.
         """
         payload = generate_geo_anomaly_transaction()
         self._send_decision_request(payload, "geo_anomaly")
 
     @task(1)
-    def high_value_new_user(self):
+    def high_value_new_subscriber(self):
         """
-        High value from new user - 1% of traffic.
-        Potential friendly fraud indicator.
+        High value from new subscriber - 1% of traffic.
+        Device upgrade fraud indicator.
         """
-        payload = generate_high_value_new_user_transaction()
-        self._send_decision_request(payload, "high_value_new_user")
+        payload = generate_high_value_new_subscriber_transaction()
+        self._send_decision_request(payload, "high_value_new_subscriber")
 
     def _send_decision_request(self, payload: dict, scenario: str):
         """Send decision request and track metrics."""
@@ -116,12 +119,52 @@ class FraudDetectionUser(HttpUser):
                 response.failure(f"HTTP {response.status_code}: {response.text}")
 
 
+class SIMFarmAttacker(HttpUser):
+    """
+    Dedicated SIM farm attacker simulation.
+
+    Sends rapid SIM activation requests with the same card to simulate
+    SIM farm setup operations. Each attacker has a small pool of cards.
+    """
+
+    # Very fast requests - simulating automated attack
+    wait_time = between(0.05, 0.15)
+
+    def on_start(self):
+        """Initialize attacker's card pool."""
+        # Each attacker has a small pool of cards they're using for SIM farm
+        self.attack_cards = [f"card_farm_{uuid4().hex[:8]}" for _ in range(3)]
+        self.current_card_idx = 0
+
+    @task
+    def rapid_sim_activation(self):
+        """Rapid SIM activations - cycles through small card pool."""
+        card_token = self.attack_cards[self.current_card_idx]
+        self.current_card_idx = (self.current_card_idx + 1) % len(self.attack_cards)
+
+        payload = generate_sim_farm_transaction(card_token=card_token)
+
+        with self.client.post(
+            "/decide",
+            json=payload,
+            name="/decide [sim_farm_attack]",
+            catch_response=True
+        ) as response:
+            if response.status_code == 200:
+                data = response.json()
+                decision = data.get("decision", "unknown")
+                # We expect BLOCK or FRICTION after velocity threshold
+                response.success()
+            else:
+                response.failure(f"HTTP {response.status_code}")
+
+
 class CardTestingUser(HttpUser):
     """
     Dedicated card testing attacker simulation.
 
-    Sends rapid requests with the same card to trigger velocity detection.
-    Use this user class for targeted card testing attack simulation.
+    Sends rapid small topup requests with the same card to trigger
+    velocity detection. Tests card validity before larger fraud.
     """
 
     # Very fast requests - simulating automated attack
@@ -130,12 +173,12 @@ class CardTestingUser(HttpUser):
     def on_start(self):
         """Initialize attacker's card pool."""
         # Each attacker has a small pool of cards they're testing
-        self.attack_cards = [f"card_attack_{uuid4().hex[:8]}" for _ in range(3)]
+        self.attack_cards = [f"card_test_{uuid4().hex[:8]}" for _ in range(3)]
         self.current_card_idx = 0
 
     @task
     def rapid_card_test(self):
-        """Rapid card testing - cycles through small card pool."""
+        """Rapid card testing via small topups - cycles through card pool."""
         card_token = self.attack_cards[self.current_card_idx]
         self.current_card_idx = (self.current_card_idx + 1) % len(self.attack_cards)
 
@@ -193,10 +236,18 @@ class SteadyStateUser(HttpUser):
 def on_test_start(environment, **kwargs):
     """Called when test starts."""
     print("=" * 60)
-    print("FRAUD DETECTION LOAD TEST")
+    print("TELCO/MSP PAYMENT FRAUD DETECTION LOAD TEST")
     print("=" * 60)
     print(f"Target host: {environment.host}")
     print(f"Traffic mix: {TRAFFIC_MIX}")
+    print()
+    print("Fraud patterns simulated:")
+    print("  - Card testing (small topups)")
+    print("  - SIM farm attacks (rapid SIM activations)")
+    print("  - Device resale fraud (subsidized device fraud)")
+    print("  - Equipment fraud (CPE/modem resale)")
+    print("  - Fraud rings (same device, multiple accounts)")
+    print("  - Geographic anomalies (unexpected locations)")
     print("=" * 60)
 
 

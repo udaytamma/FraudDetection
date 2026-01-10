@@ -1,7 +1,7 @@
 """
-Pytest Configuration and Fixtures
+Pytest Configuration and Fixtures - Telco/MSP Payment Fraud
 
-Provides shared fixtures for fraud detection tests.
+Provides shared fixtures for telco fraud detection tests.
 """
 
 import asyncio
@@ -21,6 +21,8 @@ from src.schemas import (
     DeviceInfo,
     GeoInfo,
     VerificationInfo,
+    ServiceType,
+    EventSubtype,
 )
 
 
@@ -77,12 +79,13 @@ async def api_client() -> AsyncGenerator[AsyncClient, None]:
 @pytest.fixture
 def sample_event() -> PaymentEvent:
     """
-    Create a sample payment event for testing.
+    Create a sample telco payment event for testing.
+    Mobile SIM activation scenario.
     """
     return PaymentEvent(
         transaction_id=f"txn_{uuid4().hex[:16]}",
         idempotency_key=f"idem_{uuid4().hex[:16]}",
-        amount_cents=5000,  # $50
+        amount_cents=2500,  # $25 SIM activation fee
         currency="USD",
         card_token=f"card_{uuid4().hex[:16]}",
         card_bin="411111",
@@ -90,10 +93,16 @@ def sample_event() -> PaymentEvent:
         card_brand="Visa",
         card_type="credit",
         card_country="US",
-        merchant_id="merchant_123",
-        merchant_name="Test Merchant",
-        merchant_mcc="5411",
-        merchant_country="US",
+        # Telco-specific fields
+        service_id="mobile_prepaid_001",
+        service_name="Telco Mobile Prepaid",
+        service_type=ServiceType.MOBILE,
+        service_region="US",
+        event_subtype=EventSubtype.SIM_ACTIVATION,
+        subscriber_id="subscriber_123",
+        phone_number="15551234567",
+        imei="353456789012345",
+        sim_iccid="89012600001234567890",
         user_id="user_123",
         account_age_days=30,
         is_guest=False,
@@ -140,13 +149,15 @@ def sample_event() -> PaymentEvent:
 def high_risk_event(sample_event: PaymentEvent) -> PaymentEvent:
     """
     Create a high-risk payment event for testing.
+    Device upgrade from new subscriber with suspicious signals.
     """
     event = sample_event.model_copy(deep=True)
-    event.amount_cents = 200000  # $2000
+    event.amount_cents = 120000  # $1200 device upgrade
+    event.event_subtype = EventSubtype.DEVICE_UPGRADE
     event.device.is_emulator = True
     event.geo.is_datacenter = True
     event.geo.is_tor = True
-    event.account_age_days = 1
+    event.account_age_days = 1  # New subscriber
     return event
 
 
@@ -154,9 +165,37 @@ def high_risk_event(sample_event: PaymentEvent) -> PaymentEvent:
 def card_testing_event(sample_event: PaymentEvent) -> PaymentEvent:
     """
     Create a card testing attack event for testing.
+    Small topup to test card validity.
     """
     event = sample_event.model_copy(deep=True)
-    event.amount_cents = 100  # $1 - small test amount
+    event.amount_cents = 500  # $5 topup - small test amount
+    event.event_subtype = EventSubtype.TOPUP
+    return event
+
+
+@pytest.fixture
+def sim_farm_event(sample_event: PaymentEvent) -> PaymentEvent:
+    """
+    Create a SIM farm attack event for testing.
+    Multiple SIM activations from same card.
+    """
+    event = sample_event.model_copy(deep=True)
+    event.amount_cents = 0  # Free SIM activation
+    event.event_subtype = EventSubtype.SIM_ACTIVATION
+    event.device.is_emulator = True  # Common in SIM farms
+    return event
+
+
+@pytest.fixture
+def device_upgrade_event(sample_event: PaymentEvent) -> PaymentEvent:
+    """
+    Create a device upgrade event for testing.
+    High-value subsidized device purchase.
+    """
+    event = sample_event.model_copy(deep=True)
+    event.amount_cents = 99900  # $999 device
+    event.event_subtype = EventSubtype.DEVICE_UPGRADE
+    event.imei = "353456789099999"  # Different IMEI
     return event
 
 
@@ -164,7 +203,10 @@ def card_testing_event(sample_event: PaymentEvent) -> PaymentEvent:
 def friendly_fraud_event(sample_event: PaymentEvent) -> PaymentEvent:
     """
     Create a friendly fraud risk event for testing.
+    Device upgrade from subscriber with prior chargebacks.
     """
     event = sample_event.model_copy(deep=True)
-    # Would need to set up user profile with chargeback history
+    event.event_subtype = EventSubtype.DEVICE_UPGRADE
+    event.amount_cents = 99900  # $999 device
+    # Would need to set up subscriber profile with chargeback history
     return event

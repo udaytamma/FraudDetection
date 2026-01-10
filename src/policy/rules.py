@@ -177,9 +177,9 @@ class PolicyRules(BaseModel):
         default_factory=set,
         description="Allowed user IDs (skip checks)",
     )
-    allowlist_merchants: set[str] = Field(
+    allowlist_services: set[str] = Field(
         default_factory=set,
-        description="Allowed merchant IDs (skip checks)",
+        description="Allowed service IDs (skip checks)",
     )
 
     def get_sorted_rules(self) -> list[PolicyRule]:

@@ -1,8 +1,12 @@
 """
-Fraud Detection Platform - Demo Dashboard
+Telco/MSP Payment Fraud Detection Platform - Demo Dashboard
 
 Professional-grade Streamlit dashboard for demonstrating and testing
-the fraud detection system.
+the fraud detection system for Telco/MSP payment fraud.
+
+Supports:
+- Mobile: SIM activation, topup, device upgrade, SIM swap, international enable
+- Broadband: Service activation, equipment swap, speed upgrade, equipment purchase
 
 Run: streamlit run dashboard.py --server.port 8501
 """
@@ -27,8 +31,8 @@ import asyncpg
 
 # Page configuration
 st.set_page_config(
-    page_title="Fraud Detection Platform",
-    page_icon="🛡️",
+    page_title="Telco Payment Fraud Detection",
+    page_icon="📱",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -503,21 +507,28 @@ def get_severity_badge(severity: str) -> str:
 
 
 # ============================================================================
-# Transaction Presets
+# Transaction Presets - Telco/MSP Payment Fraud Scenarios
 # ============================================================================
 
 TRANSACTION_PRESETS = {
-    "Normal Transaction": {
-        "description": "A typical legitimate transaction",
+    "SIM Activation (Normal)": {
+        "description": "Legitimate SIM activation from established subscriber",
         "payload": {
-            "amount_cents": 5000,
+            "amount_cents": 2500,  # $25 activation fee
             "card_bin": "411111",
             "card_last_four": "1234",
             "card_brand": "Visa",
             "card_type": "credit",
             "card_country": "US",
-            "merchant_mcc": "5411",
-            "merchant_country": "US",
+            "service_id": "mobile_prepaid_001",
+            "service_name": "Telco Mobile Prepaid",
+            "service_type": "mobile",
+            "service_region": "US",
+            "event_subtype": "sim_activation",
+            "subscriber_id": "subscriber_123",
+            "phone_number": "15551234567",
+            "imei": "353456789012345",
+            "sim_iccid": "89012600001234567890",
             "account_age_days": 365,
             "is_guest": False,
             "channel": "mobile",
@@ -542,24 +553,29 @@ TRANSACTION_PRESETS = {
             }
         }
     },
-    "Card Testing Attack": {
-        "description": "Small amount transaction typical of card testing",
+    "SIM Farm Attack": {
+        "description": "Rapid SIM activations with same card (SIM farm setup)",
         "payload": {
-            "amount_cents": 100,  # $1
+            "amount_cents": 0,  # Free SIM activation
             "card_bin": "411111",
             "card_last_four": "9999",
             "card_brand": "Visa",
             "card_type": "credit",
             "card_country": "US",
-            "merchant_mcc": "5999",
-            "merchant_country": "US",
+            "service_id": "mobile_prepaid_001",
+            "service_type": "mobile",
+            "service_region": "US",
+            "event_subtype": "sim_activation",
+            "subscriber_id": "subscriber_farm_001",
+            "phone_number": "15559999999",
+            "imei": "353456789099999",
             "account_age_days": 1,
             "is_guest": True,
             "channel": "web",
             "device": {
                 "device_type": "desktop",
                 "os": "Windows",
-                "is_emulator": False,
+                "is_emulator": True,
                 "is_rooted": False,
             },
             "geo": {
@@ -575,17 +591,59 @@ TRANSACTION_PRESETS = {
             }
         }
     },
-    "Velocity Attack": {
-        "description": "High-value transaction with velocity patterns",
+    "Card Testing (Topup)": {
+        "description": "Small topups to test stolen card validity",
         "payload": {
-            "amount_cents": 150000,  # $1500
+            "amount_cents": 500,  # $5 minimum topup
+            "card_bin": "411111",
+            "card_last_four": "8888",
+            "card_brand": "Visa",
+            "card_type": "credit",
+            "card_country": "US",
+            "service_id": "mobile_prepaid_001",
+            "service_type": "mobile",
+            "service_region": "US",
+            "event_subtype": "topup",
+            "subscriber_id": "subscriber_test_001",
+            "phone_number": "15558888888",
+            "account_age_days": 1,
+            "is_guest": True,
+            "channel": "web",
+            "device": {
+                "device_type": "desktop",
+                "os": "Windows",
+                "is_emulator": False,
+                "is_rooted": False,
+            },
+            "geo": {
+                "ip_address": "198.51.100.25",
+                "country_code": "US",
+                "is_vpn": True,
+                "is_datacenter": True,
+                "is_tor": False,
+            },
+            "verification": {
+                "avs_result": "N",
+                "cvv_result": "N",
+            }
+        }
+    },
+    "Device Upgrade Fraud": {
+        "description": "Subsidized device purchase from new subscriber (resale fraud)",
+        "payload": {
+            "amount_cents": 99900,  # $999 subsidized device
             "card_bin": "555555",
             "card_last_four": "4444",
             "card_brand": "Mastercard",
             "card_type": "credit",
             "card_country": "US",
-            "merchant_mcc": "5732",
-            "merchant_country": "US",
+            "service_id": "mobile_postpaid_001",
+            "service_type": "mobile",
+            "service_region": "US",
+            "event_subtype": "device_upgrade",
+            "subscriber_id": "subscriber_new_001",
+            "phone_number": "15554444444",
+            "imei": "353456789044444",
             "account_age_days": 7,
             "is_guest": False,
             "channel": "web",
@@ -608,20 +666,25 @@ TRANSACTION_PRESETS = {
             }
         }
     },
-    "Geographic Anomaly": {
-        "description": "Transaction from unexpected location",
+    "SIM Swap (Account Takeover)": {
+        "description": "SIM swap request (potential account takeover)",
         "payload": {
-            "amount_cents": 75000,  # $750
+            "amount_cents": 0,  # Free SIM swap
             "card_bin": "411111",
             "card_last_four": "5678",
             "card_brand": "Visa",
             "card_type": "credit",
             "card_country": "US",
-            "merchant_mcc": "5411",
-            "merchant_country": "NG",  # Nigeria
+            "service_id": "mobile_postpaid_001",
+            "service_type": "mobile",
+            "service_region": "US",
+            "event_subtype": "sim_swap",
+            "subscriber_id": "subscriber_existing_001",
+            "phone_number": "15555678901",
+            "sim_iccid": "89012600009999999999",
             "account_age_days": 180,
             "is_guest": False,
-            "channel": "web",
+            "channel": "call_center",
             "device": {
                 "device_type": "mobile",
                 "os": "Android",
@@ -630,7 +693,7 @@ TRANSACTION_PRESETS = {
             },
             "geo": {
                 "ip_address": "41.190.2.100",
-                "country_code": "NG",  # Nigeria
+                "country_code": "NG",  # Different country
                 "is_vpn": False,
                 "is_datacenter": False,
                 "is_tor": False,
@@ -641,25 +704,68 @@ TRANSACTION_PRESETS = {
             }
         }
     },
-    "Bot/Emulator Attack": {
-        "description": "Transaction from emulated device via Tor",
+    "Equipment Fraud (Broadband)": {
+        "description": "CPE/modem purchase for resale fraud",
         "payload": {
-            "amount_cents": 200000,  # $2000
+            "amount_cents": 19900,  # $199 equipment
             "card_bin": "378282",
             "card_last_four": "0005",
             "card_brand": "Amex",
             "card_type": "credit",
             "card_country": "US",
-            "merchant_mcc": "5944",
-            "merchant_country": "US",
+            "service_id": "broadband_fiber_001",
+            "service_type": "broadband",
+            "service_region": "US",
+            "event_subtype": "equipment_purchase",
+            "subscriber_id": "subscriber_equip_001",
+            "modem_mac": "00:1A:2B:3C:4D:5E",
+            "cpe_serial": "CPE-001234",
+            "service_address_hash": "addr_hash_12345",
             "account_age_days": 3,
             "is_guest": False,
-            "channel": "mobile",
+            "channel": "web",
+            "device": {
+                "device_type": "desktop",
+                "os": "Windows",
+                "is_emulator": False,
+                "is_rooted": False,
+            },
+            "geo": {
+                "ip_address": "185.220.101.50",
+                "country_code": "US",
+                "is_vpn": True,
+                "is_datacenter": True,
+                "is_tor": False,
+            },
+            "verification": {
+                "avs_result": "Y",
+                "cvv_result": "M",
+            }
+        }
+    },
+    "International Enable (IRSF Risk)": {
+        "description": "International roaming enable (IRSF fraud setup)",
+        "payload": {
+            "amount_cents": 5000,  # $50 setup fee
+            "card_bin": "411111",
+            "card_last_four": "7777",
+            "card_brand": "Visa",
+            "card_type": "credit",
+            "card_country": "US",
+            "service_id": "mobile_postpaid_001",
+            "service_type": "mobile",
+            "service_region": "US",
+            "event_subtype": "international_enable",
+            "subscriber_id": "subscriber_intl_001",
+            "phone_number": "15557777777",
+            "account_age_days": 14,
+            "is_guest": False,
+            "channel": "web",
             "device": {
                 "device_type": "mobile",
                 "os": "Android",
                 "os_version": "12.0",
-                "is_emulator": True,
+                "is_emulator": False,
                 "is_rooted": True,
             },
             "geo": {
@@ -675,18 +781,25 @@ TRANSACTION_PRESETS = {
             }
         }
     },
-    "Friendly Fraud Risk": {
-        "description": "High-value from account with dispute history patterns",
+    "Broadband Activation (Normal)": {
+        "description": "Legitimate broadband service activation",
         "payload": {
-            "amount_cents": 250000,  # $2500
+            "amount_cents": 9900,  # $99 activation fee
             "card_bin": "411111",
-            "card_last_four": "8888",
+            "card_last_four": "2222",
             "card_brand": "Visa",
-            "card_type": "credit",
+            "card_type": "debit",
             "card_country": "US",
-            "merchant_mcc": "5311",
-            "merchant_country": "US",
-            "account_age_days": 90,
+            "service_id": "broadband_fiber_001",
+            "service_name": "Telco Broadband Fiber",
+            "service_type": "broadband",
+            "service_region": "US",
+            "event_subtype": "service_activation",
+            "subscriber_id": "subscriber_bb_001",
+            "modem_mac": "00:1A:2B:AA:BB:CC",
+            "cpe_serial": "CPE-002222",
+            "service_address_hash": "addr_hash_22222",
+            "account_age_days": 60,
             "is_guest": False,
             "channel": "web",
             "device": {
@@ -719,9 +832,9 @@ def main():
     # Header
     st.markdown("""
     <div class="dashboard-header">
-        <h1 style="margin: 0; font-size: 2rem;">🛡️ Fraud Detection Platform</h1>
+        <h1 style="margin: 0; font-size: 2rem;">📱 Telco/MSP Payment Fraud Detection</h1>
         <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">
-            Real-time payment fraud detection with &lt;200ms latency
+            Real-time payment fraud detection for Mobile &amp; Broadband services with &lt;200ms latency
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -821,9 +934,9 @@ def main():
                 step=1.0
             )
 
-            merchant_id = st.text_input(
-                "Merchant ID",
-                value=f"merchant_{uuid4().hex[:8]}"
+            service_id = st.text_input(
+                "Service ID",
+                value=preset["payload"].get("service_id", f"service_{uuid4().hex[:8]}")
             )
 
             # Advanced options
@@ -860,7 +973,7 @@ def main():
                 payload["transaction_id"] = f"txn_{uuid4().hex[:16]}"
                 payload["idempotency_key"] = f"idem_{uuid4().hex[:16]}"
                 payload["amount_cents"] = int(amount * 100)
-                payload["merchant_id"] = merchant_id
+                payload["service_id"] = service_id
                 payload["card_token"] = card_token
                 payload["user_id"] = user_id
 
@@ -1240,7 +1353,7 @@ def main():
                 st.markdown("#### Allowlists")
                 st.markdown(f"- Cards: {len(policy.get('allowlist_cards', []))} entries")
                 st.markdown(f"- Users: {len(policy.get('allowlist_users', []))} entries")
-                st.markdown(f"- Merchants: {len(policy.get('allowlist_merchants', []))} entries")
+                st.markdown(f"- Services: {len(policy.get('allowlist_services', []))} entries")
 
             # Raw YAML
             with st.expander("Raw Policy YAML"):
@@ -1540,7 +1653,7 @@ def main():
                 allowlist_types = {
                     "allowlist_cards": "Card Tokens",
                     "allowlist_users": "User IDs",
-                    "allowlist_merchants": "Merchant IDs"
+                    "allowlist_services": "Service IDs"
                 }
 
                 for list_type, display_name in allowlist_types.items():

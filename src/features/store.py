@@ -246,9 +246,11 @@ class FeatureStore:
             tasks.append(self._get_user_profile(event.user_id))
             keys.append("user")
 
-        if event.merchant_id:
-            tasks.append(self._get_merchant_profile(event.merchant_id))
-            keys.append("merchant")
+        # Service profile (replaces merchant profile for telco)
+        # Note: Service profiles not implemented in MVP - placeholder for future
+        # if event.service_id:
+        #     tasks.append(self._get_service_profile(event.service_id))
+        #     keys.append("service")
 
         # Execute in parallel
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -420,18 +422,18 @@ class FeatureStore:
         if is_decline:
             await self.velocity.increment("card", card_token, "declines", tx_id, now_ms)
 
-        # Track distinct entities
-        if event.merchant_id:
+        # Track distinct entities (service_id replaces merchant_id for telco)
+        if event.service_id:
             await self.velocity.add_distinct(
-                "card", card_token, "merchants", event.merchant_id, now_ms
+                "card", card_token, "accounts", event.service_id, now_ms
             )
-        if event.device_id:
+        if event.device and event.device.device_id:
             await self.velocity.add_distinct(
-                "card", card_token, "devices", event.device_id, now_ms
+                "card", card_token, "devices", event.device.device_id, now_ms
             )
-        if event.ip_address:
+        if event.geo and event.geo.ip_address:
             await self.velocity.add_distinct(
-                "card", card_token, "ips", event.ip_address, now_ms
+                "card", card_token, "ips", event.geo.ip_address, now_ms
             )
 
         # Update profile hash

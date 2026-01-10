@@ -30,13 +30,15 @@ class TestDecisionEndpoint:
 
     @pytest.mark.asyncio
     async def test_minimal_request(self, api_client: AsyncClient):
-        """Test decision with minimal request."""
+        """Test decision with minimal request (telco SIM activation)."""
         payload = {
             "transaction_id": "txn_test_123",
             "idempotency_key": "idem_test_123",
-            "amount_cents": 5000,
+            "amount_cents": 2500,  # $25 SIM activation
             "card_token": "card_test_123",
-            "merchant_id": "merchant_test",
+            "service_id": "mobile_prepaid_001",
+            "service_type": "mobile",
+            "event_subtype": "sim_activation",
         }
 
         response = await api_client.post("/decide", json=payload)
@@ -65,9 +67,10 @@ class TestDecisionEndpoint:
         payload = {
             "transaction_id": "txn_idem_test",
             "idempotency_key": "idem_idem_test",
-            "amount_cents": 5000,
+            "amount_cents": 2000,  # $20 topup
             "card_token": "card_idem_test",
-            "merchant_id": "merchant_test",
+            "service_id": "mobile_prepaid_001",
+            "event_subtype": "topup",
         }
 
         # First request
@@ -86,16 +89,18 @@ class TestDecisionEndpoint:
 
     @pytest.mark.asyncio
     async def test_high_risk_blocked(self, api_client: AsyncClient):
-        """Test high-risk transaction gets blocked."""
+        """Test high-risk transaction gets blocked (device upgrade fraud)."""
         payload = {
             "transaction_id": "txn_high_risk",
             "idempotency_key": "idem_high_risk",
-            "amount_cents": 200000,  # $2000
+            "amount_cents": 120000,  # $1200 device upgrade
             "card_token": "card_high_risk",
-            "merchant_id": "merchant_test",
+            "service_id": "mobile_prepaid_001",
+            "service_type": "mobile",
+            "event_subtype": "device_upgrade",  # High-risk event
             "device": {
                 "device_id": "dev_high_risk",
-                "is_emulator": True,  # High-risk signal
+                "is_emulator": True,  # High-risk signal (SIM farm indicator)
             },
             "geo": {
                 "ip_address": "1.2.3.4",
@@ -107,7 +112,7 @@ class TestDecisionEndpoint:
 
         assert response.status_code == 200
         data = response.json()
-        # Emulator + Tor should trigger block
+        # Emulator + Tor + device upgrade should trigger block
         assert data["decision"] in ("BLOCK", "REVIEW")
         assert len(data["reasons"]) > 0
 

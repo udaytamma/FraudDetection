@@ -1,9 +1,13 @@
 """
-Payment Event Schemas
+Payment Event Schemas for Telco/MSP Payment Fraud Detection
 
 Defines the canonical PaymentEvent structure for all incoming
 transaction requests. This is the primary input to the fraud
 detection pipeline.
+
+Supports two service verticals:
+- Mobile: SIM activations, top-ups, device upgrades
+- Broadband: Service activations, equipment purchases
 """
 
 from datetime import datetime, UTC
@@ -34,11 +38,52 @@ class EventType(str, Enum):
     CHARGEBACK = "chargeback"
 
 
+class ServiceType(str, Enum):
+    """
+    Telco/MSP service verticals.
+
+    Each service type has different fraud patterns and risk profiles.
+    """
+    MOBILE = "mobile"
+    BROADBAND = "broadband"
+
+
+class EventSubtype(str, Enum):
+    """
+    High-fraud-risk event subtypes within each service vertical.
+
+    Mobile subtypes:
+    - sim_activation: New SIM card activation (SIM farm risk)
+    - sim_swap: SIM change on existing number (account takeover)
+    - device_upgrade: Subsidized device purchase (resale fraud)
+    - topup: Prepaid balance reload (stolen card testing)
+    - international_enable: International roaming activation (IRSF setup)
+
+    Broadband subtypes:
+    - service_activation: New broadband service (promo abuse)
+    - equipment_swap: Modem/router replacement (equipment fraud)
+    - speed_upgrade: Bandwidth tier upgrade (promo abuse)
+    - equipment_purchase: CPE purchase (resale fraud)
+    """
+    # Mobile
+    SIM_ACTIVATION = "sim_activation"
+    SIM_SWAP = "sim_swap"
+    DEVICE_UPGRADE = "device_upgrade"
+    TOPUP = "topup"
+    INTERNATIONAL_ENABLE = "international_enable"
+
+    # Broadband
+    SERVICE_ACTIVATION = "service_activation"
+    EQUIPMENT_SWAP = "equipment_swap"
+    SPEED_UPGRADE = "speed_upgrade"
+    EQUIPMENT_PURCHASE = "equipment_purchase"
+
+
 class DeviceInfo(BaseModel):
     """
     Device fingerprint information.
 
-    Captures device characteristics for fraud detection.
+    Captures device characteristics for payment fraud detection.
     Emulators and rooted devices are high-risk signals.
     """
     device_id: str = Field(
@@ -146,7 +191,7 @@ class VerificationInfo(BaseModel):
     """
     Card verification results from payment processor.
 
-    These signals are critical for criminal fraud detection
+    These signals are critical for criminal payment fraud detection
     and evidence collection for disputes.
     """
     avs_result: Optional[str] = Field(
@@ -173,7 +218,7 @@ class VerificationInfo(BaseModel):
 
 class PaymentEvent(BaseModel):
     """
-    Canonical Payment Event Schema.
+    Canonical Payment Event Schema for Telco/MSP Payment Fraud Detection.
 
     This is the primary input to the fraud detection pipeline.
     All fields are captured for evidence and training purposes.
@@ -183,6 +228,7 @@ class PaymentEvent(BaseModel):
     - idempotency_key for exactly-once processing
     - All amounts in cents to avoid floating point issues
     - Timestamps in UTC with timezone awareness
+    - Service-specific identifiers for telco context
     """
 
     # =========================================================================
@@ -260,37 +306,44 @@ class PaymentEvent(BaseModel):
     )
 
     # =========================================================================
-    # Merchant Information
+    # Service Information (Telco/MSP specific)
     # =========================================================================
-    merchant_id: str = Field(
+    service_id: str = Field(
         ...,
-        description="Merchant identifier",
+        description="Service identifier (e.g., mobile_prepaid_001)",
         min_length=1,
         max_length=64,
     )
-    merchant_name: Optional[str] = Field(
+    service_name: Optional[str] = Field(
         default=None,
-        description="Merchant display name",
+        description="Service display name (e.g., 'Mobile Prepaid', 'Fiber 1Gbps')",
         max_length=256,
     )
-    merchant_mcc: Optional[str] = Field(
-        default=None,
-        description="Merchant Category Code",
-        min_length=4,
-        max_length=4,
+    service_type: ServiceType = Field(
+        default=ServiceType.MOBILE,
+        description="Service vertical: mobile or broadband",
     )
-    merchant_country: Optional[str] = Field(
+    event_subtype: EventSubtype = Field(
+        default=EventSubtype.TOPUP,
+        description="Specific action within the service type",
+    )
+    service_region: Optional[str] = Field(
         default=None,
-        description="Merchant country code",
+        description="Service operating region/country code",
         max_length=2,
     )
 
     # =========================================================================
-    # User/Account Information
+    # Subscriber Information
     # =========================================================================
+    subscriber_id: Optional[str] = Field(
+        default=None,
+        description="Subscriber/customer account identifier",
+        max_length=64,
+    )
     user_id: Optional[str] = Field(
         default=None,
-        description="User/account identifier",
+        description="User/account identifier (may differ from subscriber)",
         max_length=64,
     )
     account_age_days: Optional[int] = Field(
@@ -301,6 +354,44 @@ class PaymentEvent(BaseModel):
     is_guest: bool = Field(
         default=False,
         description="True if guest checkout (no account)",
+    )
+
+    # =========================================================================
+    # Mobile-Specific Identifiers
+    # =========================================================================
+    phone_number: Optional[str] = Field(
+        default=None,
+        description="MSISDN (phone number) for mobile services",
+        max_length=20,
+    )
+    imei: Optional[str] = Field(
+        default=None,
+        description="Device IMEI for mobile services",
+        max_length=20,
+    )
+    sim_iccid: Optional[str] = Field(
+        default=None,
+        description="SIM card ICCID for mobile services",
+        max_length=22,
+    )
+
+    # =========================================================================
+    # Broadband-Specific Identifiers
+    # =========================================================================
+    modem_mac: Optional[str] = Field(
+        default=None,
+        description="Cable modem MAC address for broadband services",
+        max_length=17,
+    )
+    cpe_serial: Optional[str] = Field(
+        default=None,
+        description="Customer premises equipment serial number",
+        max_length=64,
+    )
+    service_address_hash: Optional[str] = Field(
+        default=None,
+        description="Hashed service installation address",
+        max_length=64,
     )
 
     # =========================================================================
@@ -328,7 +419,7 @@ class PaymentEvent(BaseModel):
     # =========================================================================
     channel: Optional[str] = Field(
         default=None,
-        description="Transaction channel (web, mobile, api, pos)",
+        description="Transaction channel (web, mobile_app, api, retail, call_center)",
     )
     is_recurring: bool = Field(
         default=False,
@@ -355,14 +446,6 @@ class PaymentEvent(BaseModel):
         """Ensure BIN contains only digits."""
         if v is not None and not v.isdigit():
             raise ValueError("card_bin must contain only digits")
-        return v
-
-    @field_validator("merchant_mcc")
-    @classmethod
-    def validate_mcc(cls, v: Optional[str]) -> Optional[str]:
-        """Ensure MCC contains only digits."""
-        if v is not None and not v.isdigit():
-            raise ValueError("merchant_mcc must contain only digits")
         return v
 
     @property
@@ -392,3 +475,24 @@ class PaymentEvent(BaseModel):
     def device_id(self) -> Optional[str]:
         """Convenience property to get device ID."""
         return self.device.device_id if self.device else None
+
+    @property
+    def is_high_risk_subtype(self) -> bool:
+        """Check if event subtype is high-risk for payment fraud."""
+        high_risk = {
+            EventSubtype.DEVICE_UPGRADE,
+            EventSubtype.SIM_SWAP,
+            EventSubtype.INTERNATIONAL_ENABLE,
+            EventSubtype.EQUIPMENT_PURCHASE,
+        }
+        return self.event_subtype in high_risk
+
+    @property
+    def is_mobile(self) -> bool:
+        """Check if this is a mobile service event."""
+        return self.service_type == ServiceType.MOBILE
+
+    @property
+    def is_broadband(self) -> bool:
+        """Check if this is a broadband service event."""
+        return self.service_type == ServiceType.BROADBAND

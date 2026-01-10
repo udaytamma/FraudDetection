@@ -1,13 +1,13 @@
 """
-Risk Scoring Engine
+Risk Scoring Engine - Telco/MSP Payment Fraud
 
 Combines signals from all detection modules into final risk scores.
 This is a rule-based scorer for Phase 1 (ML deferred to Phase 2).
 
 Produces:
 - Overall risk score (0.0 to 1.0)
-- Criminal fraud score
-- Friendly fraud score
+- Criminal fraud score (card testing, velocity, SIM farm, device resale)
+- Friendly fraud score (subscriber disputes, device upgrade fraud)
 - Confidence level
 """
 
@@ -33,6 +33,13 @@ class RiskScorer:
 
     Orchestrates all detection modules and combines results
     into a unified risk assessment.
+
+    For Telco/MSP Payment Fraud, key detection areas:
+    - Card testing (SIM activation probing, topup testing)
+    - Velocity attacks (SIM farms, device resale, equipment fraud)
+    - Geo anomalies (international fraud, location spoofing)
+    - Bot detection (automated SIM farm operations)
+    - Friendly fraud (device upgrade fraud, service disputes)
     """
 
     def __init__(self):
@@ -127,6 +134,7 @@ class RiskScorer:
         Compute confidence level based on data availability.
 
         Higher confidence when we have more history on entities.
+        For telco: subscriber history, device history, card history.
 
         Args:
             event: Payment event
@@ -144,12 +152,13 @@ class RiskScorer:
         else:
             confidence_factors.append(0.3)  # New card = low confidence
 
-        # User history
+        # User/Subscriber history
+        # Telco context: subscriber tenure and transaction history
         if not features.entity.user_is_guest and not features.entity.user_is_new:
             user_txns = features.entity.user_total_transactions
             confidence_factors.append(min(1.0, user_txns / 20))
         else:
-            confidence_factors.append(0.3)  # New/guest user = low confidence
+            confidence_factors.append(0.3)  # New/guest subscriber = low confidence
 
         # Device history
         device_txns = features.entity.device_total_transactions
@@ -179,6 +188,10 @@ class HighValueTransactionScorer:
     Additional scoring for high-value transactions.
 
     High-value transactions get extra scrutiny.
+
+    Telco context: device upgrades, equipment purchases,
+    international roaming enables are high-value events
+    that warrant additional verification.
     """
 
     def __init__(

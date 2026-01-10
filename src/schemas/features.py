@@ -1,9 +1,13 @@
 """
-Feature Schemas
+Feature Schemas for Telco/MSP Payment Fraud Detection
 
 Defines the feature structures used by the scoring and
 detection modules. Features are computed from entity profiles
 and real-time velocity counters.
+
+Supports two service verticals:
+- Mobile: Phone numbers, IMEIs, SIM cards
+- Broadband: Modems, CPE equipment, service addresses
 """
 
 from typing import Optional
@@ -15,8 +19,8 @@ class VelocityFeatures(BaseModel):
     """
     Real-time velocity features computed from sliding window counters.
 
-    These features are critical for detecting active attacks
-    (card testing, BIN attacks, fraud rings).
+    These features are critical for detecting active payment fraud attacks
+    (card testing, SIM farms, equipment fraud rings).
     """
 
     # ==========================================================================
@@ -42,9 +46,9 @@ class VelocityFeatures(BaseModel):
         default=0,
         description="Card declines in last 1 hour",
     )
-    card_distinct_merchants_24h: int = Field(
+    card_distinct_accounts_24h: int = Field(
         default=0,
-        description="Distinct merchants for card in last 24 hours",
+        description="Distinct subscriber accounts for card in last 24 hours",
     )
     card_distinct_devices_24h: int = Field(
         default=0,
@@ -53,6 +57,38 @@ class VelocityFeatures(BaseModel):
     card_distinct_ips_24h: int = Field(
         default=0,
         description="Distinct IPs for card in last 24 hours",
+    )
+
+    # ==========================================================================
+    # Mobile-Specific Velocity Features
+    # ==========================================================================
+    card_distinct_phone_numbers_24h: int = Field(
+        default=0,
+        description="Distinct phone numbers (MSISDNs) funded by card in 24 hours - SIM farm detection",
+    )
+    card_distinct_imeis_24h: int = Field(
+        default=0,
+        description="Distinct device IMEIs purchased/activated with card in 24 hours - device resale fraud",
+    )
+    imei_distinct_sims_7d: int = Field(
+        default=0,
+        description="Distinct SIMs activated on same IMEI in 7 days - device cloning detection",
+    )
+    phone_sim_swaps_30d: int = Field(
+        default=0,
+        description="SIM swap count for phone number in 30 days - account takeover detection",
+    )
+
+    # ==========================================================================
+    # Broadband-Specific Velocity Features
+    # ==========================================================================
+    card_distinct_modems_30d: int = Field(
+        default=0,
+        description="Distinct modem MACs purchased/activated with card in 30 days - equipment fraud",
+    )
+    address_distinct_accounts_30d: int = Field(
+        default=0,
+        description="Distinct accounts at same service address in 30 days - promo stacking",
     )
 
     # ==========================================================================
@@ -100,7 +136,7 @@ class VelocityFeatures(BaseModel):
     )
 
     # ==========================================================================
-    # User Velocity Features
+    # User/Subscriber Velocity Features
     # ==========================================================================
     user_transactions_24h: int = Field(
         default=0,
@@ -142,7 +178,8 @@ class EntityFeatures(BaseModel):
     Entity-level features derived from historical profiles.
 
     These features provide context about the entities involved
-    in a transaction based on their historical behavior.
+    in a transaction based on their historical behavior for
+    payment fraud detection.
     """
 
     # ==========================================================================
@@ -218,7 +255,7 @@ class EntityFeatures(BaseModel):
     )
 
     # ==========================================================================
-    # User Features
+    # User/Subscriber Features
     # ==========================================================================
     user_account_age_days: Optional[int] = Field(
         default=None,
@@ -254,15 +291,31 @@ class EntityFeatures(BaseModel):
     )
 
     # ==========================================================================
-    # Merchant Features
+    # Subscriber Features (Telco-specific)
     # ==========================================================================
-    merchant_is_high_risk_mcc: bool = Field(
-        default=False,
-        description="Merchant MCC is high-risk",
+    subscriber_age_days: Optional[int] = Field(
+        default=None,
+        description="Days since subscriber account creation",
     )
-    merchant_chargeback_rate_30d: float = Field(
+    subscriber_is_new: bool = Field(
+        default=True,
+        description="Subscriber account is less than 30 days old",
+    )
+    subscriber_total_services: int = Field(
+        default=0,
+        description="Total active services for subscriber (mobile lines, broadband, etc.)",
+    )
+
+    # ==========================================================================
+    # Service Features (replaces merchant features)
+    # ==========================================================================
+    service_is_high_risk: bool = Field(
+        default=False,
+        description="Service type is high-risk (device upgrade, international enable, equipment purchase)",
+    )
+    service_chargeback_rate_30d: float = Field(
         default=0.0,
-        description="Merchant chargeback rate in last 30 days",
+        description="Chargeback rate for this service type in last 30 days",
     )
 
     # ==========================================================================
@@ -287,7 +340,8 @@ class FeatureSet(BaseModel):
     Complete feature set for a transaction.
 
     Combines velocity features (real-time) and entity features
-    (historical) for use by the scoring and detection modules.
+    (historical) for use by the scoring and detection modules
+    in payment fraud detection.
     """
     velocity: VelocityFeatures = Field(
         default_factory=VelocityFeatures,
@@ -318,6 +372,20 @@ class FeatureSet(BaseModel):
     channel: Optional[str] = Field(
         default=None,
         description="Transaction channel",
+    )
+
+    # Service-level features (Telco-specific)
+    service_type: Optional[str] = Field(
+        default=None,
+        description="Service type: mobile or broadband",
+    )
+    event_subtype: Optional[str] = Field(
+        default=None,
+        description="Event subtype within service",
+    )
+    is_high_risk_subtype: bool = Field(
+        default=False,
+        description="Event subtype is high-risk for payment fraud",
     )
 
     # Verification features

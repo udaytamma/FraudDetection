@@ -1,5 +1,5 @@
 """
-Schema Tests
+Schema Tests - Telco/MSP Payment Fraud
 
 Tests for data validation and schema behavior.
 """
@@ -19,6 +19,8 @@ from src.schemas import (
     VelocityFeatures,
     EntityFeatures,
     FeatureSet,
+    ServiceType,
+    EventSubtype,
 )
 
 
@@ -32,7 +34,7 @@ class TestPaymentEvent:
             idempotency_key="idem_123",
             amount_cents=1000,
             card_token="card_abc",
-            merchant_id="merchant_123",
+            service_id="mobile_prepaid_001",
         )
 
         assert event.transaction_id == "txn_123"
@@ -47,28 +49,28 @@ class TestPaymentEvent:
             idempotency_key="idem_123",
             amount_cents=1000,
             card_token="card_abc",
-            merchant_id="merchant_123",
+            service_id="mobile_prepaid_001",
             currency="usd",
         )
 
         assert event.currency == "USD"
 
     def test_high_value_threshold(self):
-        """Test high value detection."""
+        """Test high value detection (device upgrade, equipment purchase)."""
         low_value = PaymentEvent(
             transaction_id="txn_1",
             idempotency_key="idem_1",
             amount_cents=50000,  # $500
             card_token="card_abc",
-            merchant_id="merchant_123",
+            service_id="mobile_prepaid_001",
         )
 
         high_value = PaymentEvent(
             transaction_id="txn_2",
             idempotency_key="idem_2",
-            amount_cents=150000,  # $1500
+            amount_cents=150000,  # $1500 - device upgrade
             card_token="card_abc",
-            merchant_id="merchant_123",
+            service_id="mobile_prepaid_001",
         )
 
         assert not low_value.is_high_value
@@ -81,7 +83,7 @@ class TestPaymentEvent:
             idempotency_key="idem_1",
             amount_cents=1000,
             card_token="card_abc",
-            merchant_id="merchant_123",
+            service_id="mobile_prepaid_001",
         )
 
         with_3ds = PaymentEvent(
@@ -89,7 +91,7 @@ class TestPaymentEvent:
             idempotency_key="idem_2",
             amount_cents=1000,
             card_token="card_abc",
-            merchant_id="merchant_123",
+            service_id="mobile_prepaid_001",
             verification=VerificationInfo(
                 three_ds_result="Y",
                 three_ds_version="2.2",
@@ -107,21 +109,76 @@ class TestPaymentEvent:
                 idempotency_key="idem_123",
                 amount_cents=1000,
                 card_token="card_abc",
-                merchant_id="merchant_123",
+                service_id="mobile_prepaid_001",
                 card_bin="abcdef",  # Invalid: not digits
             )
 
-    def test_invalid_mcc(self):
-        """Test that invalid MCC is rejected."""
-        with pytest.raises(ValueError):
-            PaymentEvent(
-                transaction_id="txn_123",
-                idempotency_key="idem_123",
-                amount_cents=1000,
-                card_token="card_abc",
-                merchant_id="merchant_123",
-                merchant_mcc="food",  # Invalid: not digits
-            )
+    def test_telco_service_types(self):
+        """Test telco service type and event subtype fields."""
+        mobile_event = PaymentEvent(
+            transaction_id="txn_123",
+            idempotency_key="idem_123",
+            amount_cents=2500,
+            card_token="card_abc",
+            service_id="mobile_prepaid_001",
+            service_type=ServiceType.MOBILE,
+            event_subtype=EventSubtype.SIM_ACTIVATION,
+            phone_number="15551234567",
+            imei="353456789012345",
+        )
+
+        assert mobile_event.service_type == ServiceType.MOBILE
+        assert mobile_event.event_subtype == EventSubtype.SIM_ACTIVATION
+        assert mobile_event.phone_number == "15551234567"
+
+        broadband_event = PaymentEvent(
+            transaction_id="txn_456",
+            idempotency_key="idem_456",
+            amount_cents=9900,
+            card_token="card_xyz",
+            service_id="broadband_fiber_001",
+            service_type=ServiceType.BROADBAND,
+            event_subtype=EventSubtype.SERVICE_ACTIVATION,
+            modem_mac="00:1A:2B:3C:4D:5E",
+        )
+
+        assert broadband_event.service_type == ServiceType.BROADBAND
+        assert broadband_event.event_subtype == EventSubtype.SERVICE_ACTIVATION
+
+    def test_high_risk_subtype(self):
+        """Test high-risk event subtype detection."""
+        # Device upgrade is high risk (resale fraud)
+        device_upgrade = PaymentEvent(
+            transaction_id="txn_1",
+            idempotency_key="idem_1",
+            amount_cents=99900,
+            card_token="card_abc",
+            service_id="mobile_001",
+            event_subtype=EventSubtype.DEVICE_UPGRADE,
+        )
+        assert device_upgrade.is_high_risk_subtype
+
+        # SIM swap is high risk (account takeover)
+        sim_swap = PaymentEvent(
+            transaction_id="txn_2",
+            idempotency_key="idem_2",
+            amount_cents=0,
+            card_token="card_abc",
+            service_id="mobile_001",
+            event_subtype=EventSubtype.SIM_SWAP,
+        )
+        assert sim_swap.is_high_risk_subtype
+
+        # Topup is not high risk
+        topup = PaymentEvent(
+            transaction_id="txn_3",
+            idempotency_key="idem_3",
+            amount_cents=2000,
+            card_token="card_abc",
+            service_id="mobile_001",
+            event_subtype=EventSubtype.TOPUP,
+        )
+        assert not topup.is_high_risk_subtype
 
 
 class TestRiskScores:

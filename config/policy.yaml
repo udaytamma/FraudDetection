@@ -1,5 +1,5 @@
-version: 2.0.0
-description: Telco/MSP Payment Fraud Detection Policy
+version: 1.2.4
+description: Production fraud detection policy - Phase 1 MVP
 default_action: ALLOW
 thresholds:
   risk:
@@ -20,7 +20,7 @@ thresholds:
 rules:
 - id: emulator_block
   name: Emulator Block
-  description: Block service activations from emulated devices (SIM farm indicator)
+  description: Block transactions from emulated devices
   enabled: true
   priority: 10
   conditions:
@@ -40,7 +40,7 @@ rules:
   review_priority: null
 - id: datacenter_review
   name: Datacenter Review
-  description: Review service activations from datacenter IPs (automated fraud indicator)
+  description: Review transactions from datacenter IPs
   enabled: true
   priority: 20
   conditions:
@@ -48,9 +48,9 @@ rules:
   action: REVIEW
   friction_type: null
   review_priority: HIGH
-- id: high_value_new_subscriber
-  name: High Value New Subscriber
-  description: Require 3DS for device upgrades/equipment from new subscribers
+- id: high_value_new_account
+  name: High Value New Account
+  description: Require 3DS for high-value transactions from new accounts
   enabled: true
   priority: 50
   conditions:
@@ -61,7 +61,7 @@ rules:
   review_priority: null
 - id: high_value_new_card
   name: High Value New Card
-  description: Require 3DS for device upgrade/equipment purchase with first-seen card
+  description: Require 3DS for high-value transactions with first-seen card
   enabled: true
   priority: 55
   conditions:
@@ -72,7 +72,7 @@ rules:
   review_priority: null
 - id: rooted_high_value
   name: Rooted Device High Value
-  description: Review device upgrades/equipment purchases from rooted devices
+  description: Review high-value transactions from rooted devices
   enabled: true
   priority: 60
   conditions:
@@ -81,55 +81,10 @@ rules:
   action: REVIEW
   friction_type: null
   review_priority: MEDIUM
-# Telco-specific rules
-- id: high_risk_sim_swap
-  name: High Risk SIM Swap
-  description: Review SIM swap requests (account takeover risk)
-  enabled: true
-  priority: 30
-  conditions:
-    event_subtype: sim_swap
-  action: REVIEW
-  friction_type: null
-  review_priority: HIGH
-- id: high_risk_international_enable
-  name: High Risk International Enable
-  description: Review international roaming enables (IRSF risk)
-  enabled: true
-  priority: 35
-  conditions:
-    event_subtype: international_enable
-  action: FRICTION
-  friction_type: 3DS
-  review_priority: null
-- id: device_upgrade_new_subscriber
-  name: Device Upgrade New Subscriber
-  description: Review device upgrades from subscribers < 30 days old
-  enabled: true
-  priority: 40
-  conditions:
-    event_subtype: device_upgrade
-    subscriber_is_new: true
-  action: REVIEW
-  friction_type: null
-  review_priority: HIGH
-- id: equipment_purchase_review
-  name: Equipment Purchase Review
-  description: Review CPE/equipment purchases (resale fraud risk)
-  enabled: true
-  priority: 45
-  conditions:
-    event_subtype: equipment_purchase
-  action: FRICTION
-  friction_type: 3DS
-  review_priority: null
-blocklist_cards:
-- card_fraudster_123
+blocklist_cards: []
 blocklist_devices: []
 blocklist_ips: []
 blocklist_users: []
-blocklist_phones: []
-blocklist_imeis: []
 allowlist_cards: []
 allowlist_users: []
 allowlist_services: []

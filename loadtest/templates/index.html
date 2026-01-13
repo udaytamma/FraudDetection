@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOAD OPS // Fraud Detection Stress Test</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #0d1220;
+            --bg-card: rgba(15, 23, 42, 0.8);
+            --cyan: #00f0ff;
+            --purple: #7c3aed;
+            --red: #ff3366;
+            --green: #10b981;
+            --yellow: #eab308;
+            --text-primary: #ffffff;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border: rgba(0, 240, 255, 0.2);
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 50%, #111827 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(90deg, rgba(0,240,255,0.1) 0%, transparent 50%, rgba(255,51,102,0.1) 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+            position: relative;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--cyan), var(--purple), var(--red));
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        .header-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+        }
+
+        .header-subtitle {
+            font-size: 0.75rem;
+            color: var(--cyan);
+            letter-spacing: 2px;
+            margin-top: 0.25rem;
+        }
+
+        .header-status {
+            text-align: right;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            font-size: 0.8rem;
+        }
+
+        .status-badge.running {
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .status-badge.stopped {
+            border-color: var(--text-muted);
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 currentColor; }
+            50% { opacity: 0.7; box-shadow: 0 0 10px 5px currentColor; }
+        }
+
+        /* Main container */
+        .main {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Control Panel */
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .control-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            position: relative;
+        }
+
+        .control-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(180deg, var(--cyan), transparent);
+        }
+
+        .control-card h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.85rem;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 1rem;
+        }
+
+        .input-group {
+            margin-bottom: 1rem;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--cyan);
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
+        }
+
+        .btn {
+            padding: 0.75rem 2rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--cyan), #0891b2);
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--red), #dc2626);
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            box-shadow: 0 0 30px rgba(255, 51, 102, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .metric-card:hover {
+            border-color: rgba(0, 240, 255, 0.5);
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.1);
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .metric-value.cyan { color: var(--cyan); }
+        .metric-value.green { color: var(--green); }
+        .metric-value.red { color: var(--red); }
+        .metric-value.yellow { color: var(--yellow); }
+        .metric-value.purple { color: var(--purple); }
+
+        .metric-label {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 0.5rem;
+        }
+
+        /* Charts Section */
+        .charts-section {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+        }
+
+        .chart-card h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.85rem;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .chart-container {
+            height: 300px;
+            position: relative;
+        }
+
+        /* Stats Table */
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .stats-table th {
+            background: rgba(0, 240, 255, 0.1);
+            color: var(--cyan);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .stats-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+
+        .stats-table tr:hover {
+            background: rgba(0, 240, 255, 0.05);
+        }
+
+        /* SLA indicator */
+        .sla-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .sla-pass { background: var(--green); }
+        .sla-warn { background: var(--yellow); }
+        .sla-fail { background: var(--red); }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            border-top: 1px solid var(--border);
+            margin-top: 2rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .charts-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+                gap: 1rem;
+            }
+
+            .header-status {
+                text-align: center;
+            }
+
+            .control-panel {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 240, 255, 0.3);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 240, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div>
+                <h1 class="header-title">LOAD OPS</h1>
+                <p class="header-subtitle">// FRAUD DETECTION API STRESS TEST</p>
+            </div>
+            <div class="header-status">
+                <div class="status-badge stopped" id="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="status-text">IDLE</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <div class="control-card">
+                <h3>Test Configuration</h3>
+                <div class="input-group">
+                    <label>Number of Users</label>
+                    <input type="number" id="user-count" value="10" min="1" max="10000">
+                </div>
+                <div class="input-group">
+                    <label>Spawn Rate (users/sec)</label>
+                    <input type="number" id="spawn-rate" value="1" min="0.1" max="1000" step="0.1">
+                </div>
+                <div class="input-group">
+                    <label>Target Host</label>
+                    <input type="text" id="host" value="http://localhost:8000">
+                </div>
+            </div>
+
+            <div class="control-card">
+                <h3>Test Control</h3>
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                    <button class="btn btn-primary" id="start-btn" onclick="startTest()">
+                        ▶ START SWARM
+                    </button>
+                    <button class="btn btn-danger" id="stop-btn" onclick="stopTest()" disabled>
+                        ■ STOP
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetStats()">
+                        ↻ RESET
+                    </button>
+                </div>
+                <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted);">
+                    <p>SLA Target: &lt;200ms P99 latency</p>
+                    <p>Traffic Mix: 95% legitimate, 5% attacks</p>
+                </div>
+            </div>
+
+            <div class="control-card">
+                <h3>Attack Scenarios</h3>
+                <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.8;">
+                    <p>◉ Card Testing (2%)</p>
+                    <p>◉ SIM Farm Attacks (1%)</p>
+                    <p>◉ Fraud Rings (1%)</p>
+                    <p>◉ Geo Anomalies (1%)</p>
+                    <p>◉ High-Value New Subs (1%)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value cyan" id="rps">0</div>
+                <div class="metric-label">Requests/sec</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value green" id="total-requests">0</div>
+                <div class="metric-label">Total Requests</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value red" id="failures">0</div>
+                <div class="metric-label">Failures</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value yellow" id="avg-latency">0</div>
+                <div class="metric-label">Avg Latency (ms)</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value purple" id="p99-latency">0</div>
+                <div class="metric-label">P99 Latency (ms)</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value cyan" id="user-count-display">0</div>
+                <div class="metric-label">Active Users</div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-section">
+            <div class="chart-card">
+                <h3>Response Time Distribution</h3>
+                <div class="chart-container" id="latency-chart">
+                    <canvas id="latency-canvas"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Decision Breakdown</h3>
+                <div class="chart-container" id="decision-chart">
+                    <canvas id="decision-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Table -->
+        <div class="chart-card">
+            <h3>Endpoint Statistics</h3>
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Requests</th>
+                        <th>Failures</th>
+                        <th>Avg (ms)</th>
+                        <th>P50 (ms)</th>
+                        <th>P95 (ms)</th>
+                        <th>P99 (ms)</th>
+                        <th>SLA</th>
+                    </tr>
+                </thead>
+                <tbody id="stats-body">
+                    <tr>
+                        <td>/decide [legitimate]</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td><span class="sla-indicator sla-pass"></span>Pass</td>
+                    </tr>
+                    <tr>
+                        <td>/decide [card_testing]</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td><span class="sla-indicator sla-pass"></span>Pass</td>
+                    </tr>
+                    <tr>
+                        <td>/decide [sim_farm_attack]</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td><span class="sla-indicator sla-pass"></span>Pass</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>FRAUD DETECTION LOAD TEST // TELCO/MSP PAYMENT FRAUD PLATFORM</p>
+        <p style="margin-top: 0.5rem;">Powered by Locust</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Chart.js configuration
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.borderColor = 'rgba(0, 240, 255, 0.1)';
+
+        // Latency distribution chart
+        const latencyCtx = document.getElementById('latency-canvas').getContext('2d');
+        const latencyChart = new Chart(latencyCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Response Time',
+                    data: [],
+                    borderColor: '#00f0ff',
+                    backgroundColor: 'rgba(0, 240, 255, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }, {
+                    label: 'P99',
+                    data: [],
+                    borderColor: '#7c3aed',
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            font: { family: 'JetBrains Mono', size: 10 }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(0, 240, 255, 0.1)' },
+                        ticks: { font: { family: 'JetBrains Mono', size: 10 } }
+                    },
+                    y: {
+                        grid: { color: 'rgba(0, 240, 255, 0.1)' },
+                        ticks: { font: { family: 'JetBrains Mono', size: 10 } }
+                    }
+                }
+            }
+        });
+
+        // Decision breakdown chart
+        const decisionCtx = document.getElementById('decision-canvas').getContext('2d');
+        const decisionChart = new Chart(decisionCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['ALLOW', 'FRICTION', 'REVIEW', 'BLOCK'],
+                datasets: [{
+                    data: [85, 8, 5, 2],
+                    backgroundColor: ['#10b981', '#eab308', '#7c3aed', '#ff3366'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: { family: 'JetBrains Mono', size: 10 },
+                            padding: 20
+                        }
+                    }
+                },
+                cutout: '70%'
+            }
+        });
+
+        // Test control functions
+        let isRunning = false;
+        let statsInterval = null;
+
+        function startTest() {
+            const users = document.getElementById('user-count').value;
+            const spawnRate = document.getElementById('spawn-rate').value;
+            const host = document.getElementById('host').value;
+
+            // In real implementation, this would call Locust API
+            console.log(`Starting test: ${users} users, ${spawnRate} spawn rate, ${host}`);
+
+            isRunning = true;
+            updateStatus('RUNNING', true);
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('stop-btn').disabled = false;
+
+            // Start stats polling
+            statsInterval = setInterval(updateStats, 1000);
+        }
+
+        function stopTest() {
+            isRunning = false;
+            updateStatus('STOPPED', false);
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById('stop-btn').disabled = true;
+
+            if (statsInterval) {
+                clearInterval(statsInterval);
+                statsInterval = null;
+            }
+        }
+
+        function resetStats() {
+            // Reset all metrics to 0
+            document.getElementById('rps').textContent = '0';
+            document.getElementById('total-requests').textContent = '0';
+            document.getElementById('failures').textContent = '0';
+            document.getElementById('avg-latency').textContent = '0';
+            document.getElementById('p99-latency').textContent = '0';
+            document.getElementById('user-count-display').textContent = '0';
+
+            // Reset charts
+            latencyChart.data.labels = [];
+            latencyChart.data.datasets[0].data = [];
+            latencyChart.data.datasets[1].data = [];
+            latencyChart.update();
+        }
+
+        function updateStatus(text, running) {
+            const badge = document.getElementById('status-badge');
+            const statusText = document.getElementById('status-text');
+
+            badge.className = 'status-badge ' + (running ? 'running' : 'stopped');
+            statusText.textContent = text;
+        }
+
+        function updateStats() {
+            // In real implementation, this would fetch from Locust API
+            // For demo, generate random data
+            if (!isRunning) return;
+
+            const rps = Math.floor(Math.random() * 500) + 100;
+            const totalRequests = parseInt(document.getElementById('total-requests').textContent) + rps;
+            const failures = Math.floor(Math.random() * 5);
+            const avgLatency = Math.floor(Math.random() * 30) + 30;
+            const p99Latency = avgLatency * 2.5;
+
+            document.getElementById('rps').textContent = rps;
+            document.getElementById('total-requests').textContent = totalRequests.toLocaleString();
+            document.getElementById('failures').textContent = failures;
+            document.getElementById('avg-latency').textContent = avgLatency;
+            document.getElementById('p99-latency').textContent = Math.floor(p99Latency);
+            document.getElementById('user-count-display').textContent = document.getElementById('user-count').value;
+
+            // Update latency chart
+            const now = new Date().toLocaleTimeString();
+            latencyChart.data.labels.push(now);
+            latencyChart.data.datasets[0].data.push(avgLatency);
+            latencyChart.data.datasets[1].data.push(p99Latency);
+
+            // Keep only last 30 data points
+            if (latencyChart.data.labels.length > 30) {
+                latencyChart.data.labels.shift();
+                latencyChart.data.datasets[0].data.shift();
+                latencyChart.data.datasets[1].data.shift();
+            }
+
+            latencyChart.update('none');
+        }
+    </script>
+</body>
+</html>

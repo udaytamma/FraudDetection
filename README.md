@@ -79,11 +79,23 @@ uvicorn src.api.main:app --reload --port 8000
 ### Running the Dashboard
 
 ```bash
-# In a separate terminal
+# In a separate terminal (foreground)
 streamlit run dashboard.py --server.port 8501
+
+# For background/headless mode (required for scripts/CI)
+streamlit run dashboard.py --server.port 8501 --server.headless true
 ```
 
 Open [http://localhost:8501](http://localhost:8501) for the demo dashboard.
+
+### Running Load Tests
+
+```bash
+# Start Locust web UI
+cd loadtest && locust -f locustfile.py --host=http://localhost:8000 --web-port=8089
+```
+
+Open [http://localhost:8089](http://localhost:8089) for the load testing dashboard.
 
 ## API Reference
 

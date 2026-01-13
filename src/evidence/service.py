@@ -9,6 +9,7 @@ Captures and stores transaction evidence for:
 Evidence is immutable once captured.
 """
 
+import logging
 from datetime import datetime, UTC
 from typing import Optional
 from uuid import uuid4
@@ -17,6 +18,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 from ..config import settings
+
+logger = logging.getLogger("fraud_detection.evidence")
 from ..schemas import (
     PaymentEvent,
     FeatureSet,
@@ -63,7 +66,7 @@ class EvidenceService:
                 expire_on_commit=False,
             )
         except Exception as e:
-            print(f"WARNING: Database initialization failed: {e}")
+            logger.warning("Database initialization failed: %s", e)
             # Continue without database for testing
 
     async def close(self) -> None:
@@ -262,7 +265,7 @@ class EvidenceService:
             return evidence_id
 
         except Exception as e:
-            print(f"WARNING: Evidence capture failed: {e}")
+            logger.warning("Evidence capture failed: %s", e)
             return None
 
     async def get_evidence(
@@ -372,5 +375,5 @@ class EvidenceService:
             return record_id
 
         except Exception as e:
-            print(f"WARNING: Chargeback recording failed: {e}")
+            logger.warning("Chargeback recording failed: %s", e)
             return None

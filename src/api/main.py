@@ -10,6 +10,7 @@ Endpoints:
 - GET /metrics: Prometheus metrics
 """
 
+import logging
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,6 +18,8 @@ from typing import Optional
 
 import redis.asyncio as redis
 from fastapi import FastAPI, HTTPException, Request
+
+logger = logging.getLogger("fraud_detection.api")
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -71,7 +74,7 @@ async def lifespan(app: FastAPI):
     try:
         await redis_client.ping()
     except Exception as e:
-        print(f"WARNING: Redis connection failed: {e}")
+        logger.warning("Redis connection failed: %s", e)
         # Continue without Redis for testing
 
     # Initialize services

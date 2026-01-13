@@ -17,11 +17,14 @@ Decision flow:
 """
 
 import hashlib
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import yaml
+
+logger = logging.getLogger("fraud_detection.policy")
 
 from ..schemas import (
     PaymentEvent,
@@ -85,7 +88,7 @@ class PolicyEngine:
             return True
         except Exception as e:
             # Log error but keep existing policy
-            print(f"Policy reload failed: {e}")
+            logger.error("Policy reload failed: %s", e)
             return False
 
     def evaluate(

@@ -8,9 +8,13 @@ Metrics are critical for:
 - Operational health (error rates, component health)
 """
 
+import logging
+
 from prometheus_client import Counter, Histogram, Gauge, start_http_server
 
 from ..config import settings
+
+logger = logging.getLogger("fraud_detection.metrics")
 
 
 class FraudMetrics:
@@ -186,9 +190,9 @@ def setup_metrics() -> None:
     if settings.metrics_enabled:
         try:
             start_http_server(settings.metrics_port)
-            print(f"Metrics server started on port {settings.metrics_port}")
+            logger.info("Metrics server started on port %d", settings.metrics_port)
         except Exception as e:
-            print(f"WARNING: Failed to start metrics server: {e}")
+            logger.warning("Failed to start metrics server: %s", e)
 
 
 def update_rates(allow_count: int, block_count: int, total_count: int) -> None:

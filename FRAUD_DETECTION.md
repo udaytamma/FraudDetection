@@ -241,20 +241,9 @@ Else → ALLOW
 
 ## Nebula Documentation
 
-Interview preparation materials in ProjectDocs:
+Interview preparation materials in Cyrus:
 
-**Location:** `/Users/omega/Projects/ProjectDocs/src/pages/nebula/fraud-detection-thinking/`
-
-**Pages:**
-- `index.tsx` - Overview
-- `constraints.tsx` - Section 1: Constraints First
-- `scope.tsx` - Section 2: Scope Definition
-- `technology.tsx` - Section 3: Technology Selection (CREST Framework)
-- `data-model.tsx` - Section 4: Data Model (8-step derivation)
-- `logic-policy.tsx` - Section 5: Logic & Policy (7-step derivation)
-- `failure-modes.tsx` - Section 6: Failure Modes (7-step derivation)
-- `testing.tsx` - Section 7: Testing & Validation (7-step derivation)
-- `checklist.tsx` - Section 8: Pre-Production Checklist
+**Location:** `/Users/omega/Projects/Cyrus/src/app/nebula/fraud-detection-thinking/`
 
 **Each section contains:**
 1. Thinking Process - Systematic step-by-step derivation
@@ -291,10 +280,8 @@ Interview preparation materials in ProjectDocs:
 
 **Master Prompt:** `/Users/omega/Projects/FraudDetection/PRDs/Master Prompt - Fraud Detection.txt`
 
-**Nebula Pages:** `/Users/omega/Projects/ProjectDocs/src/pages/nebula/fraud-detection-thinking/`
-
-**ProjectDocs (Functional Docs):** `/Users/omega/Projects/ProjectDocs/docs/fraud-platform/`
+**Nebula Pages:** `/Users/omega/Projects/Cyrus/src/app/nebula/fraud-detection-thinking/`
 
 ---
 
-*Last Updated: 2026-01-03*
+*Last Updated: 2026-01-13*

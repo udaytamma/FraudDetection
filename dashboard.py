@@ -938,11 +938,13 @@ def main():
             # Transaction details
             st.markdown("**Transaction Details**")
 
+            preset_amount = preset["payload"]["amount_cents"] / 100
             amount = st.number_input(
                 "Amount ($)",
-                min_value=0.01,
-                value=preset["payload"]["amount_cents"] / 100,
-                step=1.0
+                min_value=0.00,
+                value=preset_amount,
+                step=1.0,
+                help="$0.00 is valid for free activations/swaps"
             )
 
             service_id = st.text_input(

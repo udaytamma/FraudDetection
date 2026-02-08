@@ -133,9 +133,16 @@ class PolicyVersioningService:
         )
 
         # Check if we have any versions, if not create initial from YAML
+        # Race-safe: multiple workers may try to create the initial version
         active = await self.get_active_version()
         if not active:
-            await self._create_initial_version()
+            try:
+                await self._create_initial_version()
+            except Exception:
+                # Another worker already created it (unique constraint race)
+                active = await self.get_active_version()
+                if active:
+                    self._current_version_id = active.id
 
     async def close(self) -> None:
         """Close database connections."""

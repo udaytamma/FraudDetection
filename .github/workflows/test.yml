@@ -21,11 +21,11 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       postgres:
-        image: postgres:15
+        image: postgres:16
         env:
-          POSTGRES_USER: fraud
+          POSTGRES_USER: fraud_user
           POSTGRES_PASSWORD: fraud_test
-          POSTGRES_DB: fraud_evidence
+          POSTGRES_DB: fraud_detection
         ports:
           - 5432:5432
         options: >-
@@ -49,9 +49,9 @@ jobs:
         env:
           PGHOST: localhost
           PGPORT: "5432"
-          PGUSER: fraud
+          PGUSER: fraud_user
           PGPASSWORD: fraud_test
-          PGDATABASE: fraud_evidence
+          PGDATABASE: fraud_detection
         run: psql -f scripts/init_db.sql
 
       - name: Run tests
@@ -60,9 +60,9 @@ jobs:
           REDIS_PORT: "6379"
           POSTGRES_HOST: localhost
           POSTGRES_PORT: "5432"
-          POSTGRES_USER: fraud
+          POSTGRES_USER: fraud_user
           POSTGRES_PASSWORD: fraud_test
-          POSTGRES_DB: fraud_evidence
+          POSTGRES_DB: fraud_detection
         run: pytest tests/ -v --cov=src --cov-report=term-missing --cov-fail-under=70
 
       - name: Type check

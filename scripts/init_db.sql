@@ -71,6 +71,9 @@ CREATE TABLE IF NOT EXISTS transaction_evidence (
     -- Policy version ID for proper foreign key linkage (added in v1.1)
     policy_version_id INTEGER,
 
+    -- Processing latency (for dashboard analytics and SLA monitoring)
+    processing_time_ms DECIMAL(10,2),
+
     -- Indexes for common queries
     CONSTRAINT valid_decision CHECK (decision IN ('ALLOW', 'FRICTION', 'REVIEW', 'BLOCK'))
 );
@@ -287,6 +290,21 @@ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_evidence_policy_version_id ON transaction_evidence(policy_version_id);
+
+-- ============================================================================
+-- SCHEMA MIGRATIONS (idempotent)
+-- ============================================================================
+-- Add processing_time_ms to transaction_evidence if not present
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'transaction_evidence'
+        AND column_name = 'processing_time_ms'
+    ) THEN
+        ALTER TABLE transaction_evidence ADD COLUMN processing_time_ms DECIMAL(10,2);
+    END IF;
+END $$;
 
 -- ============================================================================
 -- GRANT PERMISSIONS

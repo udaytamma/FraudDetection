@@ -44,61 +44,13 @@ POSTGRES_URL = os.getenv(
     "postgresql://fraud_user:fraud_pass@localhost:5432/fraud_detection"
 )
 
-# Plotly theme constants: transparent backgrounds let Streamlit's theme show
-# through. Plotly in Streamlit auto-inherits text colors from the active theme.
-_PLOTLY_BORDER = "rgba(128,128,128,0.3)"
+# Dark-mode color constants for Plotly (CSS can't reach Plotly's SVG canvas)
+_DARK_BG = "#1e293b"
+_DARK_BORDER = "#334155"
+_DARK_TEXT = "#e2e8f0"
+_DARK_MUTED = "#94a3b8"
 
-# Inject theme-aware CSS custom properties via client-side JS.
-# st.markdown strips <script> tags, so we use st.components.v1.html()
-# which runs in an iframe and can access the parent document.
-# The script detects dark mode by checking .stApp background luminance.
-st.markdown("""
-<style>
-    /* Light mode defaults (overridden by JS if dark mode detected) */
-    :root {
-        --fd-card-bg: #f8fafc;
-        --fd-card-border: #e2e8f0;
-        --fd-tab-bg: #f1f5f9;
-        --fd-tab-text: #334155;
-        --fd-text-muted: #64748b;
-        --fd-metric-bg: #f8fafc;
-        --fd-metric-border: #e2e8f0;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# Theme detection runs in an iframe via st.components.v1.html().
-# It reads the parent .stApp background color and sets CSS vars on parent :root.
-import streamlit.components.v1 as components
-components.html("""
-<script>
-    (function() {
-        function applyTheme() {
-            var doc = window.parent.document;
-            var el = doc.querySelector('.stApp');
-            if (!el) return;
-            var bg = getComputedStyle(el).backgroundColor;
-            var m = bg.match(/\\d+/g);
-            if (!m) return;
-            var lum = (parseInt(m[0]) + parseInt(m[1]) + parseInt(m[2])) / 3;
-            var root = doc.documentElement;
-            if (lum < 128) {
-                root.style.setProperty('--fd-card-bg', '#1e293b');
-                root.style.setProperty('--fd-card-border', '#334155');
-                root.style.setProperty('--fd-tab-bg', '#1e293b');
-                root.style.setProperty('--fd-tab-text', '#e2e8f0');
-                root.style.setProperty('--fd-text-muted', '#94a3b8');
-                root.style.setProperty('--fd-metric-bg', '#1e293b');
-                root.style.setProperty('--fd-metric-border', '#334155');
-            }
-        }
-        setTimeout(applyTheme, 100);
-        setTimeout(applyTheme, 500);
-    })();
-</script>
-""", height=0)
-
-# Custom CSS for professional styling - uses var() refs from above
+# Custom CSS for dark-mode styling
 st.markdown("""
 <style>
 
@@ -205,9 +157,9 @@ st.markdown("""
         padding: 1rem;
     }
 
-    /* Reason card - theme-aware */
+    /* Reason card */
     .reason-card {
-        background-color: var(--fd-card-bg);
+        background-color: #1e293b;
         border-left: 4px solid #ef4444;
         padding: 1rem;
         margin: 0.5rem 0;
@@ -223,10 +175,10 @@ st.markdown("""
         margin-bottom: 2rem;
     }
 
-    /* Metric box - theme-aware */
+    /* Metric box */
     .metric-box {
-        background-color: var(--fd-metric-bg);
-        border: 1px solid var(--fd-metric-border);
+        background-color: #1e293b;
+        border: 1px solid #334155;
         border-radius: 8px;
         padding: 1rem;
         text-align: center;
@@ -236,13 +188,13 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Tab styling - theme-aware */
+    /* Tab styling */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
     }
     .stTabs [data-baseweb="tab"] {
-        background-color: var(--fd-tab-bg);
-        color: var(--fd-tab-text);
+        background-color: #1e293b;
+        color: #e2e8f0;
         border-radius: 8px 8px 0 0;
         padding: 0.5rem 1rem;
     }
@@ -504,26 +456,26 @@ def create_score_gauge(score: float, title: str, color_scale: str = "RdYlGn_r") 
     else:
         color = "#ef4444"  # Red
 
-    # Semi-transparent step colors work on both dark and light backgrounds
+    # Rich dark-mode gauge zone colors
     gauge_steps = [
-        {'range': [0, 30], 'color': 'rgba(16,185,129,0.2)'},
-        {'range': [30, 60], 'color': 'rgba(245,158,11,0.2)'},
-        {'range': [60, 80], 'color': 'rgba(249,115,22,0.2)'},
-        {'range': [80, 100], 'color': 'rgba(239,68,68,0.2)'}
+        {'range': [0, 30], 'color': '#064e3b'},    # Deep green
+        {'range': [30, 60], 'color': '#713f12'},    # Deep amber
+        {'range': [60, 80], 'color': '#7c2d12'},    # Deep orange
+        {'range': [80, 100], 'color': '#7f1d1d'}    # Deep red
     ]
 
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=score * 100,
         domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': title, 'font': {'size': 14}},
-        number={'suffix': "%", 'font': {'size': 24}},
+        title={'text': title, 'font': {'size': 14, 'color': _DARK_TEXT}},
+        number={'suffix': "%", 'font': {'size': 24, 'color': _DARK_TEXT}},
         gauge={
-            'axis': {'range': [0, 100], 'tickwidth': 1},
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': _DARK_MUTED},
             'bar': {'color': color},
-            'bgcolor': "rgba(0,0,0,0)",
+            'bgcolor': _DARK_BG,
             'borderwidth': 2,
-            'bordercolor': _PLOTLY_BORDER,
+            'bordercolor': _DARK_BORDER,
             'steps': gauge_steps,
             'threshold': {
                 'line': {'color': color, 'width': 2},
@@ -537,6 +489,7 @@ def create_score_gauge(score: float, title: str, color_scale: str = "RdYlGn_r") 
         height=200,
         margin=dict(l=20, r=20, t=40, b=20),
         paper_bgcolor='rgba(0,0,0,0)',
+        font={'color': _DARK_TEXT},
     )
 
     return fig
@@ -1125,7 +1078,7 @@ def main():
                         st.markdown(f"""
                         <div class="reason-card">
                             {get_severity_badge(severity)} <strong>{code}</strong><br/>
-                            <span style="color: var(--fd-text-muted);">{description}</span>
+                            <span style="color: #94a3b8;">{description}</span>
                         </div>
                         """, unsafe_allow_html=True)
                 else:
@@ -1219,6 +1172,7 @@ def main():
                         showlegend=True,
                         legend=dict(orientation="h", yanchor="bottom", y=-0.2),
                         paper_bgcolor='rgba(0,0,0,0)',
+                        font={'color': _DARK_TEXT},
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
@@ -1242,6 +1196,7 @@ def main():
                         showlegend=False,
                         paper_bgcolor='rgba(0,0,0,0)',
                         plot_bgcolor='rgba(0,0,0,0)',
+                        font={'color': _DARK_TEXT},
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
@@ -1271,6 +1226,7 @@ def main():
                     showlegend=False,
                     paper_bgcolor='rgba(0,0,0,0)',
                     plot_bgcolor='rgba(0,0,0,0)',
+                    font={'color': _DARK_TEXT},
                 )
                 st.plotly_chart(fig, use_container_width=True)
 

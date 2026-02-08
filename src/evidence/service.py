@@ -217,7 +217,8 @@ class EvidenceService:
                             geo_region,
                             geo_city,
                             policy_version,
-                            policy_version_id
+                            policy_version_id,
+                            processing_time_ms
                         ) VALUES (
                             :id,
                             :transaction_id,
@@ -254,7 +255,8 @@ class EvidenceService:
                             :geo_region,
                             :geo_city,
                             :policy_version,
-                            :policy_version_id
+                            :policy_version_id,
+                            :processing_time_ms
                         )
                     """),
                     {
@@ -295,6 +297,7 @@ class EvidenceService:
                         "geo_city": event.geo.city if event.geo else None,
                         "policy_version": response.policy_version,
                         "policy_version_id": policy_version_id,
+                        "processing_time_ms": response.processing_time_ms,
                     },
                 )
 

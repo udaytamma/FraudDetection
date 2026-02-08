@@ -27,6 +27,7 @@ from ..schemas import (
     DeviceProfile,
     IPProfile,
     UserProfile,
+    ServiceProfile,
     MerchantProfile,
     EntityProfiles,
     VelocityFeatures,
@@ -247,10 +248,9 @@ class FeatureStore:
             keys.append("user")
 
         # Service profile (replaces merchant profile for telco)
-        # Note: Service profiles not implemented in MVP - placeholder for future
-        # if event.service_id:
-        #     tasks.append(self._get_service_profile(event.service_id))
-        #     keys.append("service")
+        if event.service_id:
+            tasks.append(self._get_service_profile(event.service_id))
+            keys.append("service")
 
         # Execute in parallel
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -275,6 +275,9 @@ class FeatureStore:
             card_token=card_token,
             first_seen=datetime.fromisoformat(data.get("first_seen", datetime.now(UTC).isoformat())),
             last_seen=datetime.fromisoformat(data.get("last_seen", datetime.now(UTC).isoformat())),
+            last_geo_seen=datetime.fromisoformat(data["last_geo_seen"]) if data.get("last_geo_seen") else None,
+            last_geo_lat=float(data["last_geo_lat"]) if data.get("last_geo_lat") else None,
+            last_geo_lon=float(data["last_geo_lon"]) if data.get("last_geo_lon") else None,
             total_transactions=int(data.get("total_transactions", 0)),
             chargeback_count=int(data.get("chargeback_count", 0)),
         )
@@ -340,6 +343,22 @@ class FeatureStore:
             refund_count_90d=int(data.get("refund_count_90d", 0)),
         )
 
+    async def _get_service_profile(self, service_id: str) -> Optional[ServiceProfile]:
+        """Get service profile from Redis hash."""
+        key = f"{self.prefix}profile:service:{service_id}"
+        data = await self.redis.hgetall(key)
+
+        if not data:
+            return None
+
+        return ServiceProfile(
+            service_id=service_id,
+            service_name=data.get("service_name"),
+            first_seen=datetime.fromisoformat(data.get("first_seen", datetime.now(UTC).isoformat())),
+            last_seen=datetime.fromisoformat(data.get("last_seen", datetime.now(UTC).isoformat())),
+            total_transactions=int(data.get("total_transactions", 0)),
+        )
+
     async def _get_merchant_profile(self, merchant_id: str) -> Optional[MerchantProfile]:
         """Get merchant profile from Redis hash."""
         key = f"{self.prefix}profile:merchant:{merchant_id}"
@@ -400,6 +419,10 @@ class FeatureStore:
         if event.user_id:
             tasks.append(self._update_user(event, now, now_ms))
 
+        # Update service profile (telco/MSP)
+        if event.service_id:
+            tasks.append(self._update_service(event, now, now_ms))
+
         # Execute all updates in parallel
         await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -442,6 +465,11 @@ class FeatureStore:
         pipe.hset(profile_key, "last_seen", now.isoformat())
         pipe.hincrby(profile_key, "total_transactions", 1)
         pipe.expire(profile_key, self.WINDOW_30D)
+
+        if event.geo and event.geo.latitude is not None and event.geo.longitude is not None:
+            pipe.hset(profile_key, "last_geo_seen", now.isoformat())
+            pipe.hset(profile_key, "last_geo_lat", str(event.geo.latitude))
+            pipe.hset(profile_key, "last_geo_lon", str(event.geo.longitude))
 
         await pipe.execute()
 
@@ -562,6 +590,31 @@ class FeatureStore:
         pipe.expire(profile_key, self.WINDOW_30D)
         await pipe.execute()
 
+    async def _update_service(
+        self,
+        event: PaymentEvent,
+        now: datetime,
+        now_ms: int,
+    ) -> None:
+        """Update service profile counters."""
+        service_id = event.service_id
+        tx_id = event.transaction_id
+
+        pipe = self.redis.pipeline()
+
+        # Track velocity for service (basic)
+        await self.velocity.increment("service", service_id, "transactions", tx_id, now_ms)
+
+        profile_key = f"{self.prefix}profile:service:{service_id}"
+        pipe.hsetnx(profile_key, "first_seen", now.isoformat())
+        pipe.hset(profile_key, "last_seen", now.isoformat())
+        pipe.hincrby(profile_key, "total_transactions", 1)
+        if event.service_name:
+            pipe.hset(profile_key, "service_name", event.service_name)
+
+        pipe.expire(profile_key, self.WINDOW_30D)
+        await pipe.execute()
+
     # =========================================================================
     # Full Feature Computation
     # =========================================================================
@@ -623,6 +676,9 @@ class FeatureStore:
             features.card_total_transactions = card.total_transactions
             features.card_chargeback_count = card.chargeback_count
             features.card_is_new = card.total_transactions == 0
+            features.last_geo_seen = card.last_geo_seen
+            features.last_geo_lat = card.last_geo_lat
+            features.last_geo_lon = card.last_geo_lon
         else:
             features.card_is_new = True
 
@@ -672,6 +728,11 @@ class FeatureStore:
         if profiles.merchant:
             features.merchant_is_high_risk_mcc = profiles.merchant.is_high_risk_mcc
             features.merchant_chargeback_rate_30d = profiles.merchant.chargeback_rate_30d
+
+        # Service features (telco/MSP)
+        if profiles.service:
+            features.service_total_transactions = profiles.service.total_transactions
+            features.service_is_new = profiles.service.total_transactions == 0
 
         # Cross-entity features
         features.ip_country_card_country_match = self._check_country_match(event, profiles)

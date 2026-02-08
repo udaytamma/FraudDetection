@@ -46,6 +46,18 @@ class CardProfile(BaseModel):
         default_factory=_utc_now,
         description="When this card was last seen",
     )
+    last_geo_seen: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp of last geo observation for this card",
+    )
+    last_geo_lat: Optional[float] = Field(
+        default=None,
+        description="Last known latitude for this card",
+    )
+    last_geo_lon: Optional[float] = Field(
+        default=None,
+        description="Last known longitude for this card",
+    )
 
     # Velocity counters (sliding windows)
     attempts_10m: int = Field(
@@ -444,6 +456,34 @@ class MerchantProfile(BaseModel):
     )
 
 
+class ServiceProfile(BaseModel):
+    """
+    Service entity profile (telco/MSP).
+
+    Tracks basic service-level activity for subscriber services.
+    """
+    service_id: str = Field(
+        ...,
+        description="Service identifier",
+    )
+    service_name: Optional[str] = Field(
+        default=None,
+        description="Service display name",
+    )
+    first_seen: datetime = Field(
+        default_factory=_utc_now,
+        description="When this service was first seen",
+    )
+    last_seen: datetime = Field(
+        default_factory=_utc_now,
+        description="When this service was last seen",
+    )
+    total_transactions: int = Field(
+        default=0,
+        description="Total service transactions",
+    )
+
+
 class EntityProfiles(BaseModel):
     """
     Container for all entity profiles associated with a transaction.
@@ -465,6 +505,10 @@ class EntityProfiles(BaseModel):
     user: Optional[UserProfile] = Field(
         default=None,
         description="User profile",
+    )
+    service: Optional[ServiceProfile] = Field(
+        default=None,
+        description="Service profile",
     )
     merchant: Optional[MerchantProfile] = Field(
         default=None,

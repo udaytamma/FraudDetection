@@ -218,18 +218,45 @@ class SubscriptionAbuseScorer:
         """
         Score subscription abuse risk.
 
-        Note: Requires subscription-specific features not in MVP.
-        This is a placeholder for Phase 2.
+        Minimal heuristics using available features (capstone scope).
         """
         result = DetectionResult()
+        signals = []
 
         # Only applies to recurring transactions
         if not event.is_recurring:
             return result
 
-        # Placeholder - would check:
-        # - Multiple trials from same device/IP
-        # - Chargeback after first billing
-        # - Payment method cycling
+        # Signal 1: New user + new card on recurring charge
+        if features.entity.user_is_new and features.entity.card_is_new:
+            signals.append(0.4)
+            result.add_reason(
+                code=ReasonCodes.SUBSCRIPTION_NEW_USER,
+                description="New user and new card on recurring charge",
+                severity="MEDIUM",
+            )
+
+        # Signal 2: High short-term velocity for user
+        if features.velocity.user_transactions_24h >= 3:
+            signals.append(0.3)
+            result.add_reason(
+                code=ReasonCodes.SUBSCRIPTION_HIGH_VELOCITY,
+                description="High 24h user velocity on recurring charge",
+                severity="LOW",
+                value=str(features.velocity.user_transactions_24h),
+            )
+
+        # Signal 3: Network anonymity
+        if features.entity.ip_is_vpn or features.entity.ip_is_proxy:
+            signals.append(0.2)
+            result.add_reason(
+                code=ReasonCodes.SUBSCRIPTION_ANON_NETWORK,
+                description="Recurring charge from VPN/proxy network",
+                severity="LOW",
+            )
+
+        if signals:
+            result.score = min(1.0, max(signals) + 0.05 * (len(signals) - 1))
+            result.triggered = result.score >= 0.3
 
         return result

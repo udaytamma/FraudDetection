@@ -44,9 +44,64 @@ POSTGRES_URL = os.getenv(
     "postgresql://fraud_user:fraud_pass@localhost:5432/fraud_detection"
 )
 
-# Custom CSS for professional styling
+# Plotly theme constants: transparent backgrounds let Streamlit's theme show
+# through. Plotly in Streamlit auto-inherits text colors from the active theme.
+_PLOTLY_BORDER = "rgba(128,128,128,0.3)"
+
+# Inject theme-aware CSS custom properties via client-side JS.
+# st.markdown strips <script> tags, so we use st.components.v1.html()
+# which runs in an iframe and can access the parent document.
+# The script detects dark mode by checking .stApp background luminance.
 st.markdown("""
 <style>
+    /* Light mode defaults (overridden by JS if dark mode detected) */
+    :root {
+        --fd-card-bg: #f8fafc;
+        --fd-card-border: #e2e8f0;
+        --fd-tab-bg: #f1f5f9;
+        --fd-tab-text: #334155;
+        --fd-text-muted: #64748b;
+        --fd-metric-bg: #f8fafc;
+        --fd-metric-border: #e2e8f0;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Theme detection runs in an iframe via st.components.v1.html().
+# It reads the parent .stApp background color and sets CSS vars on parent :root.
+import streamlit.components.v1 as components
+components.html("""
+<script>
+    (function() {
+        function applyTheme() {
+            var doc = window.parent.document;
+            var el = doc.querySelector('.stApp');
+            if (!el) return;
+            var bg = getComputedStyle(el).backgroundColor;
+            var m = bg.match(/\\d+/g);
+            if (!m) return;
+            var lum = (parseInt(m[0]) + parseInt(m[1]) + parseInt(m[2])) / 3;
+            var root = doc.documentElement;
+            if (lum < 128) {
+                root.style.setProperty('--fd-card-bg', '#1e293b');
+                root.style.setProperty('--fd-card-border', '#334155');
+                root.style.setProperty('--fd-tab-bg', '#1e293b');
+                root.style.setProperty('--fd-tab-text', '#e2e8f0');
+                root.style.setProperty('--fd-text-muted', '#94a3b8');
+                root.style.setProperty('--fd-metric-bg', '#1e293b');
+                root.style.setProperty('--fd-metric-border', '#334155');
+            }
+        }
+        setTimeout(applyTheme, 100);
+        setTimeout(applyTheme, 500);
+    })();
+</script>
+""", height=0)
+
+# Custom CSS for professional styling - uses var() refs from above
+st.markdown("""
+<style>
+
     /* Main container styling */
     .main .block-container {
         padding-top: 2rem;
@@ -76,7 +131,7 @@ st.markdown("""
         font-weight: 600;
     }
 
-    /* Decision badges */
+    /* Decision badges - white text on colored bg, works in both modes */
     .decision-allow {
         background-color: #10b981;
         color: white;
@@ -110,7 +165,7 @@ st.markdown("""
         display: inline-block;
     }
 
-    /* Severity badges */
+    /* Severity badges - white text on colored bg, works in both modes */
     .severity-critical {
         background-color: #7f1d1d;
         color: white;
@@ -150,16 +205,16 @@ st.markdown("""
         padding: 1rem;
     }
 
-    /* Reason card */
+    /* Reason card - theme-aware */
     .reason-card {
-        background-color: #f8fafc;
+        background-color: var(--fd-card-bg);
         border-left: 4px solid #ef4444;
         padding: 1rem;
         margin: 0.5rem 0;
         border-radius: 0 8px 8px 0;
     }
 
-    /* Header styling */
+    /* Header styling - gradient works in both modes */
     .dashboard-header {
         background: linear-gradient(90deg, #1e3a5f 0%, #2d5a87 100%);
         padding: 1.5rem;
@@ -168,10 +223,10 @@ st.markdown("""
         margin-bottom: 2rem;
     }
 
-    /* Metric box */
+    /* Metric box - theme-aware */
     .metric-box {
-        background-color: #f8fafc;
-        border: 1px solid #e2e8f0;
+        background-color: var(--fd-metric-bg);
+        border: 1px solid var(--fd-metric-border);
         border-radius: 8px;
         padding: 1rem;
         text-align: center;
@@ -181,18 +236,19 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Tab styling */
+    /* Tab styling - theme-aware */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
     }
     .stTabs [data-baseweb="tab"] {
-        background-color: #f1f5f9;
+        background-color: var(--fd-tab-bg);
+        color: var(--fd-tab-text);
         border-radius: 8px 8px 0 0;
         padding: 0.5rem 1rem;
     }
     .stTabs [aria-selected="true"] {
         background-color: #3b82f6;
-        color: white;
+        color: white !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -369,7 +425,7 @@ async def get_decision_history(limit: int = 100) -> pd.DataFrame:
                 friendly_fraud_score,
                 amount_cents,
                 card_token,
-                merchant_id,
+                COALESCE(service_id, merchant_id) AS service_id,
                 processing_time_ms,
                 captured_at
             FROM transaction_evidence
@@ -448,6 +504,14 @@ def create_score_gauge(score: float, title: str, color_scale: str = "RdYlGn_r") 
     else:
         color = "#ef4444"  # Red
 
+    # Semi-transparent step colors work on both dark and light backgrounds
+    gauge_steps = [
+        {'range': [0, 30], 'color': 'rgba(16,185,129,0.2)'},
+        {'range': [30, 60], 'color': 'rgba(245,158,11,0.2)'},
+        {'range': [60, 80], 'color': 'rgba(249,115,22,0.2)'},
+        {'range': [80, 100], 'color': 'rgba(239,68,68,0.2)'}
+    ]
+
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=score * 100,
@@ -457,17 +521,12 @@ def create_score_gauge(score: float, title: str, color_scale: str = "RdYlGn_r") 
         gauge={
             'axis': {'range': [0, 100], 'tickwidth': 1},
             'bar': {'color': color},
-            'bgcolor': "white",
+            'bgcolor': "rgba(0,0,0,0)",
             'borderwidth': 2,
-            'bordercolor': "#e2e8f0",
-            'steps': [
-                {'range': [0, 30], 'color': '#d1fae5'},
-                {'range': [30, 60], 'color': '#fef3c7'},
-                {'range': [60, 80], 'color': '#fed7aa'},
-                {'range': [80, 100], 'color': '#fecaca'}
-            ],
+            'bordercolor': _PLOTLY_BORDER,
+            'steps': gauge_steps,
             'threshold': {
-                'line': {'color': "#1e293b", 'width': 2},
+                'line': {'color': color, 'width': 2},
                 'thickness': 0.75,
                 'value': score * 100
             }
@@ -478,7 +537,6 @@ def create_score_gauge(score: float, title: str, color_scale: str = "RdYlGn_r") 
         height=200,
         margin=dict(l=20, r=20, t=40, b=20),
         paper_bgcolor='rgba(0,0,0,0)',
-        font={'color': "#1e293b"}
     )
 
     return fig
@@ -1067,7 +1125,7 @@ def main():
                         st.markdown(f"""
                         <div class="reason-card">
                             {get_severity_badge(severity)} <strong>{code}</strong><br/>
-                            <span style="color: #64748b;">{description}</span>
+                            <span style="color: var(--fd-text-muted);">{description}</span>
                         </div>
                         """, unsafe_allow_html=True)
                 else:
@@ -1159,7 +1217,8 @@ def main():
                     fig.update_layout(
                         margin=dict(l=20, r=20, t=20, b=20),
                         showlegend=True,
-                        legend=dict(orientation="h", yanchor="bottom", y=-0.2)
+                        legend=dict(orientation="h", yanchor="bottom", y=-0.2),
+                        paper_bgcolor='rgba(0,0,0,0)',
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
@@ -1180,7 +1239,9 @@ def main():
                         margin=dict(l=20, r=20, t=20, b=20),
                         xaxis_title="Hour",
                         yaxis_title="Transactions",
-                        showlegend=False
+                        showlegend=False,
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)',
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
@@ -1207,7 +1268,9 @@ def main():
                     margin=dict(l=20, r=20, t=20, b=20),
                     xaxis_title="Hour",
                     yaxis_title="Avg Latency (ms)",
-                    showlegend=False
+                    showlegend=False,
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
                 )
                 st.plotly_chart(fig, use_container_width=True)
 

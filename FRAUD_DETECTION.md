@@ -6,7 +6,7 @@
 
 **Purpose:** Real-time fraud detection system for payment transactions, designed for interview preparation (Principal TPM/Senior TPM at Mag7 companies) and potential implementation.
 
-**Status:** Design Complete, Implementation Pending
+**Status:** MVP implemented (FastAPI + Redis + Postgres). Target architecture is documented as a future phase.
 
 **Location:** `/Users/omega/Projects/FraudDetection`
 
@@ -47,15 +47,34 @@ The master prompt (`PRDs/Master Prompt - Fraud Detection.txt`) establishes:
 - **>92%** approval rate target
 - **<10%** false positive rate among blocks
 
+Implementation note: exactly-once decision responses are enforced via Redis + Postgres idempotency records (capstone scope).
+
 ---
 
-## Technology Stack (Selected)
+## Capstone Scope & Intent
+
+This repository intentionally implements a **capstone MVP** that demonstrates end‑to‑end decisioning, evidence capture, and policy management with minimal infrastructure. The Kafka/Flink/Feast/OPA/Seldon architecture described below is a **target reference design** for Phase 2, not a claim of current implementation.
+
+---
+
+## Technology Stack
+
+### Current MVP (Implemented)
+
+| Component | Technology | Why Selected |
+|-----------|------------|--------------|
+| API | FastAPI | Simple, high-performance request handling |
+| State Store | Redis | Low-latency velocity counters + entity profiles |
+| Evidence Store | PostgreSQL | Structured evidence + audit trail |
+| Policy Engine | YAML + custom evaluator | Hot-reloadable and versioned for demo |
+| Monitoring | Prometheus client + in-app `/metrics` | Lightweight metrics for demo |
+
+### Target Architecture (Phase 2, Not Implemented)
 
 | Component | Technology | Why Selected |
 |-----------|------------|--------------|
 | Event Streaming | Kafka | Exactly-once semantics, partition-by-key ordering, log retention for replay |
 | Stream Processing | Flink | True event-by-event processing, native sliding windows, checkpoint recovery |
-| Fast State Store | Redis Cluster | <5ms reads, ZSET for sliding windows, HyperLogLog for distinct counts |
 | Feature Store | Feast + Delta Lake | Open source, Spark integration, point-in-time correctness |
 | Policy Engine | OPA + Custom Wrapper | Hot-reloadable Rego policies, version-controlled, audit trail |
 | Model Serving | Seldon | Kubernetes-native, canary deployments, explainability |
@@ -93,6 +112,15 @@ The master prompt (`PRDs/Master Prompt - Fraud Detection.txt`) establishes:
 
 ---
 
+## Evidence Vault & Compliance (Capstone)
+
+- Raw sensitive identifiers (device ID, IP, fingerprint) are stored **encrypted** in `evidence_vault`.
+- Primary evidence table stores **HMAC-hashed** identifiers for analytics.
+- Retention is enforced by a scheduled purge (`scripts/purge_evidence_vault.py`).
+- This is a **PCI-aware** design, not a claim of PCI DSS certification.
+
+---
+
 ## Data Model
 
 ### Core Entities (Derived from Money Flow)
@@ -103,7 +131,10 @@ The master prompt (`PRDs/Master Prompt - Fraud Detection.txt`) establishes:
 | **Device** | Shared across fraud rings, emulated | Redis Hash | distinct_cards_24h (HLL), is_emulator, is_rooted |
 | **IP** | Proxied, VPN, datacenter | Redis Hash | distinct_cards_1h, is_datacenter, geo_country |
 | **User** | Fake accounts, ATO, friendly fraud | Redis Hash | account_age_days, chargeback_rate_90d, risk_tier |
-| **Merchant** | Collusion, high-risk MCC | Redis Hash | mcc, chargeback_rate, is_high_risk |
+| **Service** | Telco/MSP account abuse | Redis Hash | total_transactions, first_seen, last_seen |
+| **Merchant** | Collusion, high-risk MCC (legacy alias) | Redis Hash | mcc, chargeback_rate, is_high_risk |
+
+> Note: `merchant_*` columns are maintained as a backward-compatible alias for `service_*` in the capstone MVP.
 
 ### Event Types
 

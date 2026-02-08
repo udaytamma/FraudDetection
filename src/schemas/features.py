@@ -10,6 +10,7 @@ Supports two service verticals:
 - Broadband: Modems, CPE equipment, service addresses
 """
 
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -201,6 +202,18 @@ class EntityFeatures(BaseModel):
         default=True,
         description="Card seen for the first time",
     )
+    last_geo_seen: Optional[datetime] = Field(
+        default=None,
+        description="Last geo observation timestamp for this card",
+    )
+    last_geo_lat: Optional[float] = Field(
+        default=None,
+        description="Last known latitude for this card",
+    )
+    last_geo_lon: Optional[float] = Field(
+        default=None,
+        description="Last known longitude for this card",
+    )
 
     # ==========================================================================
     # Device Features
@@ -252,6 +265,18 @@ class EntityFeatures(BaseModel):
     ip_total_transactions: int = Field(
         default=0,
         description="Total IP transactions (all time)",
+    )
+
+    # ==========================================================================
+    # Service Features (Telco/MSP)
+    # ==========================================================================
+    service_total_transactions: int = Field(
+        default=0,
+        description="Total service transactions (all time)",
+    )
+    service_is_new: bool = Field(
+        default=True,
+        description="Service seen for the first time",
     )
 
     # ==========================================================================

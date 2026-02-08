@@ -139,14 +139,32 @@ class GeoAnomalyDetector(BaseDetector):
             )
 
         # =======================================================================
-        # Note: Impossible travel detection would require storing
-        # last transaction location per entity. For MVP, we focus on
-        # country-level checks. Full implementation would:
-        # 1. Store last (lat, lon, timestamp) in entity profile
-        # 2. Calculate distance to current location
-        # 3. Calculate time delta
-        # 4. Check if speed exceeds max_travel_speed
+        # Check 4: Impossible travel (card-level last geo observation)
         # =======================================================================
+        if (
+            event.geo
+            and event.geo.latitude is not None
+            and event.geo.longitude is not None
+            and features.entity.last_geo_lat is not None
+            and features.entity.last_geo_lon is not None
+            and features.entity.last_geo_seen is not None
+        ):
+            is_impossible, speed = self.check_impossible_travel(
+                current_lat=event.geo.latitude,
+                current_lon=event.geo.longitude,
+                current_time=event.timestamp,
+                previous_lat=features.entity.last_geo_lat,
+                previous_lon=features.entity.last_geo_lon,
+                previous_time=features.entity.last_geo_seen,
+            )
+            if is_impossible:
+                signals.append(0.8)
+                result.add_reason(
+                    code=ReasonCodes.GEO_IMPOSSIBLE_TRAVEL,
+                    description="Transaction location implies impossible travel speed",
+                    severity="HIGH",
+                    value=f"{speed:.0f} km/h" if speed else None,
+                )
 
         # =======================================================================
         # Compute final score

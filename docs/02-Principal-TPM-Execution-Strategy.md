@@ -161,17 +161,15 @@ Week 4-5: Gradual Ramp (25% → 50% → 100%)
 | **Error rate breaker** | Error counter | >1% errors for 2min | Auto-rollback to legacy |
 | **Approval rate guard** | Rolling metric | Drops >5% vs baseline | Alert Fraud Ops, pause ramp |
 | **Block rate guard** | Rolling metric | Rises >3% vs baseline | Alert Fraud Ops, investigate |
-| **Safe mode** | Fallback logic | Any critical failure | Rule-only scoring, FRICTION default |
+| **Safe mode** | Fallback logic | Any critical failure | Configurable decision via `SAFE_MODE_DECISION` |
 
 ### Safe Mode Behavior
 
 When safe mode activates:
-1. ML scoring disabled (if enabled)
-2. Rule-based scoring only
-3. Default decision: FRICTION (not ALLOW)
-4. Blocklist checks still active
-5. Alert on-call immediately
-6. Automatic recovery when component healthy for 5 minutes
+1. Decisioning is bypassed
+2. Response is deterministic based on `SAFE_MODE_DECISION` (ALLOW/BLOCK/REVIEW)
+3. On-call is alerted
+4. Recovery is manual for capstone (toggle off `SAFE_MODE_ENABLED`)
 
 ---
 

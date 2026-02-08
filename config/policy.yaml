@@ -1,4 +1,4 @@
-version: 1.2.4
+version: 1.0.0
 description: Production fraud detection policy - Phase 1 MVP
 default_action: ALLOW
 thresholds:

@@ -9,8 +9,11 @@ Captures and stores transaction evidence for:
 Evidence is immutable once captured.
 """
 
+import json
 import logging
-from datetime import datetime, UTC
+import hmac
+import hashlib
+from datetime import datetime, UTC, timedelta
 from typing import Optional
 from uuid import uuid4
 
@@ -18,6 +21,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 from ..config import settings
+from ..metrics import metrics
 
 logger = logging.getLogger("fraud_detection.evidence")
 from ..schemas import (
@@ -26,6 +30,11 @@ from ..schemas import (
     RiskScores,
     FraudDecisionResponse,
 )
+
+try:
+    from cryptography.fernet import Fernet
+except Exception:  # pragma: no cover - optional dependency for vault encryption
+    Fernet = None
 
 
 class EvidenceService:
@@ -112,6 +121,7 @@ class EvidenceService:
 
         try:
             evidence_id = str(uuid4())
+            vault_id = str(uuid4())
 
             # Build features snapshot
             features_snapshot = {
@@ -155,6 +165,18 @@ class EvidenceService:
                 for r in response.reasons
             ]
 
+            # Build raw identifiers payload for vault
+            raw_payload = {
+                "device_id": event.device.device_id if event.device else None,
+                "ip_address": event.geo.ip_address if event.geo else None,
+                "device_fingerprint": device_fingerprint,
+                "user_id": event.user_id,
+            }
+
+            device_id_hash = self._hash_value(raw_payload["device_id"])
+            ip_address_hash = self._hash_value(raw_payload["ip_address"])
+            fingerprint_hash = self._hash_value(self._stable_json(raw_payload["device_fingerprint"]))
+
             async with self.session_factory() as session:
                 # Insert evidence record
                 await session.execute(
@@ -166,6 +188,8 @@ class EvidenceService:
                             captured_at,
                             amount_cents,
                             currency,
+                            service_id,
+                            service_name,
                             merchant_id,
                             merchant_name,
                             merchant_mcc,
@@ -173,7 +197,9 @@ class EvidenceService:
                             card_bin,
                             card_last_four,
                             device_id,
+                            device_id_hash,
                             ip_address,
+                            ip_address_hash,
                             user_id,
                             risk_score,
                             criminal_score,
@@ -186,6 +212,7 @@ class EvidenceService:
                             three_ds_result,
                             three_ds_version,
                             device_fingerprint,
+                            device_fingerprint_hash,
                             geo_country,
                             geo_region,
                             geo_city,
@@ -198,6 +225,8 @@ class EvidenceService:
                             :captured_at,
                             :amount_cents,
                             :currency,
+                            :service_id,
+                            :service_name,
                             :merchant_id,
                             :merchant_name,
                             :merchant_mcc,
@@ -205,19 +234,22 @@ class EvidenceService:
                             :card_bin,
                             :card_last_four,
                             :device_id,
+                            :device_id_hash,
                             :ip_address,
+                            :ip_address_hash,
                             :user_id,
                             :risk_score,
                             :criminal_score,
                             :friendly_fraud_score,
                             :decision,
-                            :decision_reasons,
-                            :features_snapshot,
+                            :decision_reasons::jsonb,
+                            :features_snapshot::jsonb,
                             :avs_result,
                             :cvv_result,
                             :three_ds_result,
                             :three_ds_version,
-                            :device_fingerprint,
+                            :device_fingerprint::jsonb,
+                            :device_fingerprint_hash,
                             :geo_country,
                             :geo_region,
                             :geo_city,
@@ -232,6 +264,8 @@ class EvidenceService:
                         "captured_at": datetime.now(UTC),
                         "amount_cents": event.amount_cents,
                         "currency": event.currency,
+                        "service_id": event.service_id,
+                        "service_name": event.service_name,
                         # Map service_id to merchant_id column (backward compatible)
                         "merchant_id": event.service_id,
                         "merchant_name": event.service_name,
@@ -239,20 +273,23 @@ class EvidenceService:
                         "card_token": event.card_token,
                         "card_bin": event.card_bin,
                         "card_last_four": event.card_last_four,
-                        "device_id": event.device.device_id if event.device else None,
-                        "ip_address": event.geo.ip_address if event.geo else None,
+                        "device_id": None,
+                        "device_id_hash": device_id_hash,
+                        "ip_address": None,
+                        "ip_address_hash": ip_address_hash,
                         "user_id": event.user_id,
                         "risk_score": scores.risk_score,
                         "criminal_score": scores.criminal_score,
                         "friendly_fraud_score": scores.friendly_fraud_score,
                         "decision": response.decision.value,
-                        "decision_reasons": str(decision_reasons),  # JSON
-                        "features_snapshot": str(features_snapshot),  # JSON
+                        "decision_reasons": json.dumps(decision_reasons),
+                        "features_snapshot": json.dumps(features_snapshot),
                         "avs_result": event.verification.avs_result if event.verification else None,
                         "cvv_result": event.verification.cvv_result if event.verification else None,
                         "three_ds_result": event.verification.three_ds_result if event.verification else None,
                         "three_ds_version": event.verification.three_ds_version if event.verification else None,
-                        "device_fingerprint": str(device_fingerprint) if device_fingerprint else None,
+                        "device_fingerprint": json.dumps(device_fingerprint) if device_fingerprint else None,
+                        "device_fingerprint_hash": fingerprint_hash,
                         "geo_country": event.geo.country_code if event.geo else None,
                         "geo_region": event.geo.region if event.geo else None,
                         "geo_city": event.geo.city if event.geo else None,
@@ -260,12 +297,15 @@ class EvidenceService:
                         "policy_version_id": policy_version_id,
                     },
                 )
+
+                await self._insert_vault_record(session, vault_id, evidence_id, raw_payload)
                 await session.commit()
 
             return evidence_id
 
         except Exception as e:
             logger.warning("Evidence capture failed: %s", e)
+            metrics.errors_total.labels(error_type="EvidenceCaptureFailed").inc()
             return None
 
     async def get_evidence(
@@ -295,6 +335,128 @@ class EvidenceService:
             )
             row = result.mappings().first()
             return dict(row) if row else None
+
+    async def get_idempotency_response(self, idempotency_key: str) -> Optional[dict]:
+        """Retrieve cached idempotency response from Postgres."""
+        if not self.session_factory:
+            return None
+
+        async with self.session_factory() as session:
+            result = await session.execute(
+                text("""
+                    SELECT response_json
+                    FROM idempotency_records
+                    WHERE idempotency_key = :idempotency_key
+                      AND (expires_at IS NULL OR expires_at > NOW())
+                """),
+                {"idempotency_key": idempotency_key},
+            )
+            row = result.mappings().first()
+            if not row:
+                return None
+            payload = row["response_json"]
+            if isinstance(payload, str):
+                return json.loads(payload)
+            return payload
+
+    async def store_idempotency_response(
+        self,
+        idempotency_key: str,
+        response_json: dict,
+        ttl_hours: int = 24,
+    ) -> None:
+        """Store idempotency response in Postgres with TTL."""
+        if not self.session_factory:
+            return
+
+        expires_at = datetime.now(UTC) + timedelta(hours=ttl_hours) if ttl_hours else None
+        async with self.session_factory() as session:
+            await session.execute(
+                text("""
+                    INSERT INTO idempotency_records (
+                        idempotency_key,
+                        response_json,
+                        created_at,
+                        expires_at
+                    ) VALUES (
+                        :idempotency_key,
+                        :response_json::jsonb,
+                        :created_at,
+                        :expires_at
+                    )
+                    ON CONFLICT (idempotency_key) DO NOTHING
+                """),
+                {
+                    "idempotency_key": idempotency_key,
+                    "response_json": json.dumps(response_json),
+                    "created_at": datetime.now(UTC),
+                    "expires_at": expires_at,
+                },
+            )
+            await session.commit()
+
+    async def _insert_vault_record(
+        self,
+        session: AsyncSession,
+        vault_id: str,
+        evidence_id: str,
+        raw_payload: dict,
+    ) -> None:
+        """Insert encrypted raw identifiers into the evidence vault."""
+        if not settings.evidence_vault_key:
+            logger.warning("Evidence vault key not configured; skipping vault write")
+            return
+        if Fernet is None:
+            logger.warning("cryptography not installed; skipping vault write")
+            return
+
+        fernet = Fernet(settings.evidence_vault_key)
+        ciphertext = fernet.encrypt(json.dumps(raw_payload).encode("utf-8")).decode("utf-8")
+        expires_at = datetime.now(UTC) + timedelta(days=settings.evidence_retention_days)
+
+        await session.execute(
+            text("""
+                INSERT INTO evidence_vault (
+                    id,
+                    evidence_id,
+                    ciphertext,
+                    created_at,
+                    expires_at
+                ) VALUES (
+                    :id,
+                    :evidence_id,
+                    :ciphertext,
+                    :created_at,
+                    :expires_at
+                )
+            """),
+            {
+                "id": vault_id,
+                "evidence_id": evidence_id,
+                "ciphertext": ciphertext,
+                "created_at": datetime.now(UTC),
+                "expires_at": expires_at,
+            },
+        )
+
+    def _hash_value(self, value: Optional[str]) -> Optional[str]:
+        """Return a deterministic HMAC hash for identifiers."""
+        if not value:
+            return None
+        if not settings.evidence_hash_key:
+            logger.warning("Evidence hash key not configured; storing null hash")
+            return None
+        return hmac.new(
+            settings.evidence_hash_key.encode("utf-8"),
+            value.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+    @staticmethod
+    def _stable_json(value: Optional[dict]) -> Optional[str]:
+        if value is None:
+            return None
+        return json.dumps(value, sort_keys=True)
 
     async def record_chargeback(
         self,

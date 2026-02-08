@@ -187,7 +187,7 @@ def setup_metrics() -> None:
 
     Starts HTTP server on configured port to expose metrics.
     """
-    if settings.metrics_enabled:
+    if settings.metrics_enabled and settings.metrics_external_enabled:
         try:
             start_http_server(settings.metrics_port)
             logger.info("Metrics server started on port %d", settings.metrics_port)

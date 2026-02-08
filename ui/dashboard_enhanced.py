@@ -33,6 +33,48 @@ st.set_page_config(
 
 # Configuration
 API_URL = os.getenv("FRAUD_API_URL", "http://localhost:8000")
+METRICS_TOKEN = os.getenv("FRAUD_METRICS_TOKEN", "")
+METRICS_HEADERS = {"X-API-Key": METRICS_TOKEN} if METRICS_TOKEN else {}
+
+
+def fetch_metrics_summary(hours: int = 24) -> Optional[dict]:
+    """Fetch live telemetry from the API if available."""
+    try:
+        resp = httpx.get(
+            f"{API_URL}/metrics/summary",
+            params={"hours": hours},
+            headers=METRICS_HEADERS,
+            timeout=2.5,
+        )
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception:
+        return None
+    return None
+
+
+def _aggregate_events_by_hour(events: list[dict]) -> tuple[list[datetime], list[float], list[float], list[int]]:
+    """Aggregate telemetry events into hourly averages and p99."""
+    buckets: dict[datetime, list[float]] = {}
+    for event in events:
+        ts = datetime.fromisoformat(event["ts"])
+        hour = ts.replace(minute=0, second=0, microsecond=0)
+        buckets.setdefault(hour, []).append(event["latency_ms"])
+
+    times = sorted(buckets.keys())
+    avgs = []
+    p99s = []
+    counts = []
+    for hour in times:
+        values = buckets[hour]
+        values_sorted = sorted(values)
+        index = int(round(0.99 * (len(values_sorted) - 1)))
+        p99 = values_sorted[index] if values_sorted else 0
+        avgs.append(sum(values) / len(values))
+        p99s.append(p99)
+        counts.append(len(values))
+
+    return times, avgs, p99s, counts
 
 # =============================================================================
 # THEME CONFIGURATION
@@ -1227,10 +1269,14 @@ def create_decision_donut(data: dict) -> go.Figure:
 
 def create_latency_chart(hours: int = 24) -> go.Figure:
     """Create a latency over time chart with SLA line."""
-    # Generate mock data for demo
-    times = [datetime.now() - timedelta(hours=i) for i in range(hours, 0, -1)]
-    latencies = [random.gauss(45, 15) for _ in range(hours)]
-    p99_latencies = [l * 2.5 for l in latencies]
+    summary = fetch_metrics_summary(hours=hours)
+    if summary and summary.get("events"):
+        times, latencies, p99_latencies, _ = _aggregate_events_by_hour(summary["events"])
+    else:
+        # Fallback to mock data for demo
+        times = [datetime.now() - timedelta(hours=i) for i in range(hours, 0, -1)]
+        latencies = [random.gauss(45, 15) for _ in range(hours)]
+        p99_latencies = [l * 2.5 for l in latencies]
 
     fig = go.Figure()
 
@@ -1296,8 +1342,12 @@ def create_latency_chart(hours: int = 24) -> go.Figure:
 
 def create_volume_chart(hours: int = 24) -> go.Figure:
     """Create a transaction volume bar chart."""
-    times = [datetime.now() - timedelta(hours=i) for i in range(hours, 0, -1)]
-    volumes = [random.randint(500, 2000) for _ in range(hours)]
+    summary = fetch_metrics_summary(hours=hours)
+    if summary and summary.get("events"):
+        times, _, _, volumes = _aggregate_events_by_hour(summary["events"])
+    else:
+        times = [datetime.now() - timedelta(hours=i) for i in range(hours, 0, -1)]
+        volumes = [random.randint(500, 2000) for _ in range(hours)]
 
     fig = go.Figure(data=[
         go.Bar(

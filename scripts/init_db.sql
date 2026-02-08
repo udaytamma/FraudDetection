@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS transaction_evidence (
     -- Transaction details (immutable snapshot)
     amount_cents BIGINT NOT NULL,
     currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+    service_id VARCHAR(64),
+    service_name VARCHAR(256),
     merchant_id VARCHAR(64) NOT NULL,
     merchant_name VARCHAR(256),
     merchant_mcc VARCHAR(4),
@@ -31,7 +33,9 @@ CREATE TABLE IF NOT EXISTS transaction_evidence (
     card_bin VARCHAR(8),
     card_last_four VARCHAR(4),
     device_id VARCHAR(64),
+    device_id_hash VARCHAR(64),
     ip_address INET,
+    ip_address_hash VARCHAR(64),
     user_id VARCHAR(64),
 
     -- Risk signals captured at decision time
@@ -54,6 +58,7 @@ CREATE TABLE IF NOT EXISTS transaction_evidence (
 
     -- Device fingerprint data
     device_fingerprint JSONB,
+    device_fingerprint_hash VARCHAR(64),
 
     -- Geo data
     geo_country VARCHAR(2),
@@ -77,8 +82,39 @@ CREATE TABLE IF NOT EXISTS transaction_evidence (
 CREATE INDEX IF NOT EXISTS idx_evidence_card_token ON transaction_evidence(card_token);
 CREATE INDEX IF NOT EXISTS idx_evidence_user_id ON transaction_evidence(user_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_merchant_id ON transaction_evidence(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_evidence_service_id ON transaction_evidence(service_id);
+CREATE INDEX IF NOT EXISTS idx_evidence_device_hash ON transaction_evidence(device_id_hash);
+CREATE INDEX IF NOT EXISTS idx_evidence_ip_hash ON transaction_evidence(ip_address_hash);
 CREATE INDEX IF NOT EXISTS idx_evidence_captured_at ON transaction_evidence(captured_at);
 CREATE INDEX IF NOT EXISTS idx_evidence_decision ON transaction_evidence(decision);
+
+-- ============================================================================
+-- EVIDENCE VAULT
+-- Encrypted raw identifiers retained for compliance window
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS evidence_vault (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    evidence_id UUID NOT NULL REFERENCES transaction_evidence(id) ON DELETE CASCADE,
+    ciphertext TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vault_evidence_id ON evidence_vault(evidence_id);
+CREATE INDEX IF NOT EXISTS idx_vault_expires_at ON evidence_vault(expires_at);
+
+-- ============================================================================
+-- IDEMPOTENCY RECORDS
+-- Persistent idempotency store for exactly-once semantics
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS idempotency_records (
+    idempotency_key VARCHAR(128) PRIMARY KEY,
+    response_json JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_idempotency_expires_at ON idempotency_records(expires_at);
 
 -- ============================================================================
 -- CHARGEBACKS TABLE

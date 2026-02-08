@@ -94,8 +94,7 @@ class Settings(BaseSettings):
         description="PostgreSQL username"
     )
     postgres_password: str = Field(
-        default="REDACTED_POSTGRES_PASSWORD",
-        description="PostgreSQL password"
+        description="PostgreSQL password (required - set via POSTGRES_PASSWORD env var)"
     )
 
     @computed_field
@@ -133,6 +132,38 @@ class Settings(BaseSettings):
     )
 
     # =========================================================================
+    # Security / Access Control (capstone-friendly)
+    # =========================================================================
+    api_token: str | None = Field(
+        default=None,
+        description="API token for decisioning endpoints (optional)"
+    )
+    admin_token: str | None = Field(
+        default=None,
+        description="Admin token for policy mutation endpoints (optional)"
+    )
+    metrics_token: str | None = Field(
+        default=None,
+        description="Token required to access /metrics (optional)"
+    )
+    cors_allow_origins: str = Field(
+        default="http://localhost:3000,http://localhost:8501",
+        description="Comma-separated list of allowed CORS origins"
+    )
+
+    # =========================================================================
+    # Safe Mode / Kill Switch
+    # =========================================================================
+    safe_mode_enabled: bool = Field(
+        default=False,
+        description="If true, bypass decisioning and return safe_mode_decision"
+    )
+    safe_mode_decision: Literal["ALLOW", "BLOCK", "REVIEW"] = Field(
+        default="ALLOW",
+        description="Decision returned when safe mode is enabled"
+    )
+
+    # =========================================================================
     # Latency Targets (milliseconds)
     # These are the SLA requirements from the design document
     # =========================================================================
@@ -156,10 +187,42 @@ class Settings(BaseSettings):
         default=True,
         description="Enable Prometheus metrics endpoint"
     )
+    metrics_external_enabled: bool = Field(
+        default=False,
+        description="Enable standalone metrics server (binds separate port)"
+    )
     metrics_port: int = Field(
         default=9100,
         description="Prometheus metrics port"
     )
+
+    # =========================================================================
+    # Evidence Vault / Compliance
+    # =========================================================================
+    evidence_vault_key: str | None = Field(
+        default=None,
+        description="Base64 key for evidence vault encryption (Fernet)"
+    )
+    evidence_hash_key: str | None = Field(
+        default=None,
+        description="Secret key used for HMAC hashing of identifiers"
+    )
+    evidence_retention_days: int = Field(
+        default=730,
+        description="Retention window (days) for encrypted evidence vault"
+    )
+    idempotency_ttl_hours: int = Field(
+        default=24,
+        description="Retention window (hours) for idempotency records"
+    )
+
+    @computed_field
+    @property
+    def cors_allow_origins_list(self) -> list[str]:
+        """Return CORS origins as a list."""
+        if not self.cors_allow_origins:
+            return []
+        return [origin.strip() for origin in self.cors_allow_origins.split(",") if origin.strip()]
 
     # =========================================================================
     # Feature Store Configuration (Velocity Windows)

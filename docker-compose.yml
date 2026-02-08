@@ -29,9 +29,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: fraud_detection
-      POSTGRES_USER: fraud_user
-      POSTGRES_PASSWORD: REDACTED_POSTGRES_PASSWORD
+      POSTGRES_DB: ${POSTGRES_DB:-fraud_detection}
+      POSTGRES_USER: ${POSTGRES_USER:-fraud_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql

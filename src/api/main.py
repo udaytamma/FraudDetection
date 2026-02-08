@@ -10,6 +10,7 @@ Endpoints:
 - GET /metrics: Prometheus metrics
 """
 
+import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -17,14 +18,15 @@ from pathlib import Path
 from typing import Optional
 
 import redis.asyncio as redis
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 
 logger = logging.getLogger("fraud_detection.api")
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from ..config import settings
-from ..schemas import PaymentEvent, FraudDecisionResponse, Decision
+from ..schemas import PaymentEvent, FraudDecisionResponse, Decision, RiskScores
 from ..features import FeatureStore
 from ..scoring import RiskScorer
 from ..policy import (
@@ -36,8 +38,9 @@ from ..policy import (
     ListUpdate,
 )
 from ..evidence import EvidenceService
-from ..metrics import metrics, setup_metrics
+from ..metrics import metrics, setup_metrics, telemetry
 from .dependencies import get_redis, get_db_pool
+from .auth import require_api_token, require_admin_token, require_metrics_token
 
 
 # Global instances (initialized in lifespan)
@@ -123,7 +126,7 @@ def create_app() -> FastAPI:
     # CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Configure appropriately for production
+        allow_origins=settings.cors_allow_origins_list,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -179,8 +182,24 @@ async def health_check():
     return health
 
 
+@app.get("/metrics")
+def metrics_endpoint(_: None = Depends(require_metrics_token)):
+    """Expose Prometheus metrics with optional token auth."""
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+@app.get("/metrics/summary")
+def metrics_summary(hours: int = 24, _: None = Depends(require_metrics_token)):
+    """Return recent decision telemetry for dashboards."""
+    return telemetry.snapshot(hours=hours)
+
+
 @app.post("/decide", response_model=FraudDecisionResponse)
-async def make_decision(event: PaymentEvent, request: Request):
+async def make_decision(
+    event: PaymentEvent,
+    request: Request,
+    _: None = Depends(require_api_token),
+):
     """
     Make a fraud decision for a payment transaction.
 
@@ -198,6 +217,12 @@ async def make_decision(event: PaymentEvent, request: Request):
     try:
         # Track request
         metrics.requests_total.labels(endpoint="/decide").inc()
+
+        # Safe mode: bypass decisioning for controlled fallback
+        if settings.safe_mode_enabled:
+            response = _safe_mode_response(event)
+            telemetry.record(response.decision.value, response.processing_time_ms)
+            return response
 
         # =======================================================================
         # Step 1: Check idempotency (return cached result if exists)
@@ -269,26 +294,32 @@ async def make_decision(event: PaymentEvent, request: Request):
         # Step 6: Update entity profiles (async, don't block response)
         # =======================================================================
         is_decline = decision == Decision.BLOCK
-        # Fire and forget - update profiles in background
-        await feature_store.update_entity_profiles(event, is_decline)
+        _fire_and_forget(
+            feature_store.update_entity_profiles(event, is_decline),
+            "update_entity_profiles",
+        )
 
         # =======================================================================
         # Step 7: Capture evidence (async)
         # =======================================================================
-        # Get policy version ID for evidence linkage
         policy_version_id = policy_versioning.current_version_id if policy_versioning else None
-        await evidence_service.capture_evidence(
-            event, features, scores, response, policy_version_id=policy_version_id
+        _fire_and_forget(
+            evidence_service.capture_evidence(
+                event, features, scores, response, policy_version_id=policy_version_id
+            ),
+            "capture_evidence",
         )
 
         # =======================================================================
-        # Step 8: Cache result for idempotency
+        # Step 8: Persist idempotency record + cache result
         # =======================================================================
+        await _persist_idempotency(event.idempotency_key, response)
         await _cache_result(event.idempotency_key, response)
 
         # Track metrics
         metrics.decisions_total.labels(decision=decision.value).inc()
         metrics.e2e_latency.observe(total_time)
+        telemetry.record(decision.value, total_time)
 
         # Log slow requests
         if total_time > settings.target_e2e_latency_ms:
@@ -303,20 +334,28 @@ async def make_decision(event: PaymentEvent, request: Request):
 
 async def _check_idempotency(idempotency_key: str) -> Optional[FraudDecisionResponse]:
     """Check if we've already processed this request."""
-    if not redis_client:
-        return None
+    if redis_client:
+        try:
+            key = f"{settings.redis_key_prefix}idempotency:{idempotency_key}"
+            cached = await redis_client.get(key)
+            if cached:
+                import json
+                data = json.loads(cached)
+                response = FraudDecisionResponse(**data)
+                response.is_cached = True
+                return response
+        except Exception:
+            pass
 
-    try:
-        key = f"{settings.redis_key_prefix}idempotency:{idempotency_key}"
-        cached = await redis_client.get(key)
-        if cached:
-            import json
-            data = json.loads(cached)
-            response = FraudDecisionResponse(**data)
-            response.is_cached = True
-            return response
-    except Exception:
-        pass
+    if evidence_service:
+        try:
+            record = await evidence_service.get_idempotency_response(idempotency_key)
+            if record:
+                response = FraudDecisionResponse(**record)
+                response.is_cached = True
+                return response
+        except Exception:
+            pass
 
     return None
 
@@ -336,6 +375,20 @@ async def _cache_result(idempotency_key: str, response: FraudDecisionResponse) -
         )
     except Exception:
         pass
+
+
+async def _persist_idempotency(idempotency_key: str, response: FraudDecisionResponse) -> None:
+    """Persist idempotency response in Postgres (fallback for Redis)."""
+    if not evidence_service:
+        return
+    try:
+        await evidence_service.store_idempotency_response(
+            idempotency_key,
+            response.model_dump(),
+            ttl_hours=settings.idempotency_ttl_hours,
+        )
+    except Exception as e:
+        logger.warning("Idempotency persistence failed: %s", e)
 
 
 def _get_friction_message(friction_type: str) -> str:
@@ -361,8 +414,44 @@ def _get_review_notes(reasons: list) -> str:
     return "; ".join(r.description for r in reasons[:3])
 
 
+def _safe_mode_response(event: PaymentEvent) -> FraudDecisionResponse:
+    """Return a deterministic response when safe mode is enabled."""
+    decision = Decision[settings.safe_mode_decision]
+    response = FraudDecisionResponse(
+        transaction_id=event.transaction_id,
+        idempotency_key=event.idempotency_key,
+        decision=decision,
+        reasons=[],
+        scores=RiskScores(risk_score=0.0, criminal_score=0.0, friendly_fraud_score=0.0),
+        friction_type=None,
+        friction_message=None,
+        review_priority=None,
+        review_notes=None,
+        processing_time_ms=0.0,
+        feature_time_ms=0.0,
+        scoring_time_ms=0.0,
+        policy_time_ms=0.0,
+        policy_version=policy_engine.version if policy_engine else "unknown",
+        is_cached=False,
+    )
+    return response
+
+
+def _fire_and_forget(coro, name: str) -> None:
+    """Run a coroutine in the background and log failures."""
+    task = asyncio.create_task(coro)
+
+    def _log_exception(task_ref: asyncio.Task) -> None:
+        try:
+            task_ref.result()
+        except Exception as exc:  # pragma: no cover - best effort logging
+            logger.warning("Background task %s failed: %s", name, exc)
+
+    task.add_done_callback(_log_exception)
+
+
 @app.get("/policy/version")
-async def get_policy_version():
+async def get_policy_version(_: None = Depends(require_api_token)):
     """Get current policy version and hash."""
     return {
         "version": policy_engine.version,
@@ -371,7 +460,7 @@ async def get_policy_version():
 
 
 @app.post("/policy/reload")
-async def reload_policy():
+async def reload_policy(_: None = Depends(require_admin_token)):
     """Reload policy from configuration file."""
     if policy_engine.reload_policy():
         return {
@@ -388,7 +477,7 @@ async def reload_policy():
 # =============================================================================
 
 @app.get("/policy")
-async def get_policy():
+async def get_policy(_: None = Depends(require_api_token)):
     """Get the current active policy configuration."""
     version = await policy_versioning.get_active_version()
     if not version:
@@ -404,7 +493,7 @@ async def get_policy():
 
 
 @app.get("/policy/versions")
-async def list_policy_versions(limit: int = 50):
+async def list_policy_versions(limit: int = 50, _: None = Depends(require_api_token)):
     """List all policy versions, most recent first."""
     versions = await policy_versioning.list_versions(limit=limit)
     return {
@@ -424,7 +513,7 @@ async def list_policy_versions(limit: int = 50):
 
 
 @app.get("/policy/versions/{version}")
-async def get_policy_version(version: str):
+async def get_policy_version(version: str, _: None = Depends(require_api_token)):
     """Get a specific policy version."""
     v = await policy_versioning.get_version(version)
     if not v:
@@ -445,7 +534,11 @@ async def get_policy_version(version: str):
 
 
 @app.put("/policy/thresholds")
-async def update_thresholds(updates: list[ThresholdUpdate], changed_by: str = "system"):
+async def update_thresholds(
+    updates: list[ThresholdUpdate],
+    changed_by: str = "system",
+    _: None = Depends(require_admin_token),
+):
     """
     Update score thresholds.
 
@@ -467,7 +560,11 @@ async def update_thresholds(updates: list[ThresholdUpdate], changed_by: str = "s
 
 
 @app.post("/policy/rules")
-async def add_rule(rule: RuleUpdate, changed_by: str = "system"):
+async def add_rule(
+    rule: RuleUpdate,
+    changed_by: str = "system",
+    _: None = Depends(require_admin_token),
+):
     """Add a new policy rule."""
     try:
         version = await policy_versioning.add_rule(rule, changed_by=changed_by)
@@ -485,7 +582,12 @@ async def add_rule(rule: RuleUpdate, changed_by: str = "system"):
 
 
 @app.put("/policy/rules/{rule_id}")
-async def update_rule(rule_id: str, rule: RuleUpdate, changed_by: str = "system"):
+async def update_rule(
+    rule_id: str,
+    rule: RuleUpdate,
+    changed_by: str = "system",
+    _: None = Depends(require_admin_token),
+):
     """Update an existing policy rule."""
     if rule.id != rule_id:
         raise HTTPException(status_code=400, detail="Rule ID in path must match body")
@@ -506,7 +608,11 @@ async def update_rule(rule_id: str, rule: RuleUpdate, changed_by: str = "system"
 
 
 @app.delete("/policy/rules/{rule_id}")
-async def delete_rule(rule_id: str, changed_by: str = "system"):
+async def delete_rule(
+    rule_id: str,
+    changed_by: str = "system",
+    _: None = Depends(require_admin_token),
+):
     """Delete a policy rule."""
     try:
         version = await policy_versioning.delete_rule(rule_id, changed_by=changed_by)

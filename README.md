@@ -1,6 +1,6 @@
 # Fraud Detection Platform
 
-Real-time payment fraud detection system with velocity-based rules, ML-ready architecture, and comprehensive observability.
+Real-time payment fraud detection system with velocity-based rules, ML roadmap, and comprehensive observability.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109-009688.svg)](https://fastapi.tiangolo.com)
@@ -70,7 +70,7 @@ cp .env.example .env
 # Edit .env with your settings
 
 # Initialize database
-python -c "from scripts.init_db import init; init()"
+psql -f scripts/init_db.sql
 
 # Start API server
 uvicorn src.api.main:app --reload --port 8000
@@ -135,7 +135,8 @@ Content-Type: application/json
 | GET | `/health` | Health check |
 | GET | `/policy/version` | Current policy version |
 | POST | `/policy/reload` | Hot-reload policy config |
-| GET | `/metrics` | Prometheus metrics |
+| GET | `/metrics` | Prometheus metrics (token-protected if configured) |
+| GET | `/metrics/summary` | Recent telemetry for dashboards |
 
 ## Project Structure
 
@@ -203,10 +204,16 @@ rules:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
-| `DATABASE_URL` | PostgreSQL connection | `postgresql://...` |
-| `POLICY_PATH` | Policy config path | `config/policy.yaml` |
-| `LOG_LEVEL` | Logging level | `INFO` |
+| `POSTGRES_HOST/PORT/USER/PASSWORD/DB` | PostgreSQL connection pieces | (see `.env.example`) |
+| `REDIS_HOST/PORT/DB` | Redis connection pieces | (see `.env.example`) |
+| `API_TOKEN` | Token for `/decide` and policy reads | optional |
+| `ADMIN_TOKEN` | Token for policy mutation | optional |
+| `METRICS_TOKEN` | Token for `/metrics` and `/metrics/summary` | optional |
+| `SAFE_MODE_ENABLED` | Bypass decisioning | `false` |
+| `SAFE_MODE_DECISION` | ALLOW/BLOCK/REVIEW | `ALLOW` |
+| `EVIDENCE_VAULT_KEY` | Encryption key for vault | required for vault |
+| `EVIDENCE_HASH_KEY` | HMAC key for identifiers | required for hashing |
+| `EVIDENCE_RETENTION_DAYS` | Vault retention | `730` |
 
 ## Detection Logic
 
@@ -262,16 +269,16 @@ pytest tests/test_card_testing.py -v
 
 ### Prometheus Metrics
 
-Available at `/metrics`:
+Available at `/metrics` (token required if set):
 
 - `fraud_decisions_total` - Decision counts by outcome
-- `fraud_latency_seconds` - Decision latency histogram
+- `fraud_e2e_latency_ms` - Decision latency histogram
 - `fraud_signals_total` - Signal trigger counts
 - `fraud_policy_version` - Current policy version
 
 ### Grafana Dashboard
 
-Import `config/grafana-dashboard.json` for pre-built visualizations.
+Import `config/grafana-dashboard.json` for pre-built visualizations (optional).
 
 ## Documentation
 

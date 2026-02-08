@@ -112,12 +112,100 @@ This repository intentionally implements a **capstone MVP** that demonstrates en
 
 ---
 
+## RBAC & Security Architecture
+
+### Authentication Model
+
+The API implements a three-tier token authentication system:
+
+| Token Type | Environment Variable | Scope |
+|------------|---------------------|-------|
+| API Token | `API_TOKEN` | Decision endpoints, policy reads |
+| Admin Token | `ADMIN_TOKEN` | Policy mutation, configuration changes |
+| Metrics Token | `METRICS_TOKEN` | Observability endpoints |
+
+### Endpoint Protection
+
+| Endpoint | Required Token | Dependency Function |
+|----------|---------------|---------------------|
+| `POST /decide` | API_TOKEN | `require_api_token` |
+| `GET /policy/*` | API_TOKEN | `require_api_token` |
+| `POST /policy/reload` | ADMIN_TOKEN | `require_admin_token` |
+| `GET /metrics` | METRICS_TOKEN | `require_metrics_token` |
+| `GET /metrics/summary` | METRICS_TOKEN | `require_metrics_token` |
+| `GET /health` | None | Open |
+
+### Supported Headers
+
+```
+Authorization: Bearer <token>
+X-API-Key: <token>
+```
+
+### Capstone Security Limitations
+
+These are documented as accepted risks for capstone scope:
+
+1. **No timing attack resistance** - Direct string comparison in `src/api/auth.py` is vulnerable to timing attacks. Production should use `secrets.compare_digest()`.
+
+2. **No audit logging** - Authentication attempts (success/failure) are not logged. Production needs auth audit trail for security monitoring.
+
+3. **No token rotation** - Same token until manually changed. Production should support token refresh/rotation.
+
+4. **No per-user identity** - Shared tokens without individual accountability. Production should integrate with identity provider.
+
+---
+
 ## Evidence Vault & Compliance (Capstone)
 
-- Raw sensitive identifiers (device ID, IP, fingerprint) are stored **encrypted** in `evidence_vault`.
-- Primary evidence table stores **HMAC-hashed** identifiers for analytics.
-- Retention is enforced by a scheduled purge (`scripts/purge_evidence_vault.py`).
-- This is a **PCI-aware** design, not a claim of PCI DSS certification.
+### Two-Table Architecture
+
+| Table | Purpose | Data Stored |
+|-------|---------|-------------|
+| `fraud_evidence` | Primary evidence | HMAC-hashed identifiers, scores, decisions, timestamps |
+| `evidence_vault` | Sensitive data | Fernet-encrypted raw identifiers (device ID, IP, fingerprint) |
+
+### Data Flow
+
+```
+                  ┌─────────────────────────┐
+                  │     /decide request     │
+                  └───────────┬─────────────┘
+                              │
+                              ▼
+              ┌───────────────────────────────┐
+              │    Decision + Scoring         │
+              └───────────────┬───────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              │                               │
+              ▼                               ▼
+    ┌─────────────────┐             ┌─────────────────┐
+    │ fraud_evidence  │             │ evidence_vault  │
+    │ (HMAC hashed)   │             │ (Encrypted)     │
+    └─────────────────┘             └─────────────────┘
+```
+
+### Encryption Details
+
+- **Vault Encryption**: Fernet symmetric encryption (AES-128-CBC + HMAC-SHA256)
+- **Identifier Hashing**: HMAC-SHA256 with separate key
+- **Key Storage**: Environment variables (`EVIDENCE_VAULT_KEY`, `EVIDENCE_HASH_KEY`)
+
+### Retention Policy
+
+- Default: 730 days (2 years) for chargeback dispute window
+- Configurable via `EVIDENCE_RETENTION_DAYS`
+- Purge script: `scripts/purge_evidence_vault.py`
+
+### Production Gap: Key Rotation
+
+The capstone does not implement key rotation. For production:
+- Version encryption keys
+- Re-encrypt vault on rotation
+- Maintain key history for decryption of old records
+
+This is a **PCI-aware** design, not a claim of PCI DSS certification.
 
 ---
 
@@ -196,13 +284,62 @@ Else → ALLOW
 | ML Service | Timeout/crash | Rule-based scoring |
 | Policy Engine | Config error | Hardcoded safe mode rules |
 | Evidence Vault | Write failure | Queue locally, retry |
+| Idempotency (Redis) | Redis unavailable | PostgreSQL fallback |
+| Background Tasks | Task failure | Fire-and-forget (no retry) |
+
+### Idempotency Implementation
+
+```
+                     ┌──────────────┐
+                     │   Request    │
+                     └──────┬───────┘
+                            │
+                            ▼
+                    ┌───────────────┐
+                    │ Check Redis   │
+                    │ idempotency   │
+                    └───────┬───────┘
+                            │
+              ┌─────────────┴─────────────┐
+              │                           │
+         Hit (cached)              Miss (new request)
+              │                           │
+              ▼                           ▼
+    ┌─────────────────┐         ┌─────────────────┐
+    │ Return cached   │         │ Process request │
+    │ decision        │         │ + store result  │
+    └─────────────────┘         └────────┬────────┘
+                                         │
+                                         ▼
+                                ┌─────────────────┐
+                                │ Write to Redis  │
+                                │ + Postgres      │
+                                └─────────────────┘
+```
+
+**Capstone limitation:** Redis and Postgres idempotency records can diverge on failover. Production should use distributed transaction or saga pattern.
 
 ### Safe Mode Behavior
 
-- Blocklist checks still work (local cache)
-- Rule-based scoring replaces ML
-- Default action is FRICTION, not ALLOW
-- Lower thresholds (more conservative)
+When `SAFE_MODE_ENABLED=true`:
+- All scoring bypassed
+- Returns configured `SAFE_MODE_DECISION` (default: ALLOW)
+- Evidence still captured
+- Metrics still recorded
+
+**Use cases:**
+- False positive spikes causing revenue loss
+- Deployment of new scoring logic
+- Dependency failures (Redis/Postgres degraded)
+
+### Background Task Limitations
+
+Evidence capture and async operations use fire-and-forget background tasks:
+- No retry mechanism on failure
+- No dead letter queue
+- Task failures are logged but not recovered
+
+Production recommendation: Use Celery or similar task queue with retry and DLQ.
 
 ### Attack vs Bug Detection
 
@@ -307,6 +444,49 @@ Interview preparation materials in Cyrus:
 
 ---
 
+## Security Decisions & Accepted Risks
+
+> **Context:** This is a portfolio/demo deployment on Railway. The security posture is intentionally "good enough for demo" -- not enterprise-grade. This section documents what we implemented, what we skipped, and why.
+
+### What We Implemented (Portfolio-Grade)
+
+| Control | Implementation | Status |
+|---------|---------------|--------|
+| API token auth | Static `API_TOKEN` via `X-API-Key` header on all `/decide` and `/policy/*` endpoints | Implemented |
+| Admin token separation | Separate `ADMIN_TOKEN` for policy mutation endpoints (`PUT /policy/thresholds`, `POST /policy/rules`) | Implemented |
+| Private networking | Dashboard -> API communication over Railway private network (`api.railway.internal:8080`), not public internet | Implemented |
+| Health endpoint (no auth) | `GET /health` is unauthenticated -- allows Railway health checks and external monitoring | By design |
+| CORS | `CORS_ALLOW_ORIGINS="*"` -- permissive for demo, would be locked to dashboard domain in production | Accepted risk |
+| HTTPS | TLS termination at Railway's edge proxy (Metal Edge) for all public endpoints | Provided by Railway |
+
+### What Enterprise Would Require (Not Implemented)
+
+| Enterprise Control | Current Gap | Risk Accepted |
+|-------------------|------------|---------------|
+| **Secret management** | API_TOKEN is copy-pasted between api and dashboard services. Should use Railway Shared Variables (`${{api.API_TOKEN}}`) or a secrets vault (HashiCorp Vault, AWS Secrets Manager) | Token rotation requires updating 2 services manually |
+| **mTLS / service mesh** | Inter-service comms use static token over private networking. Enterprise uses mutual TLS (Istio, Linkerd) where both sides verify certificates | A compromised service on the same Railway project could impersonate the dashboard |
+| **Token rotation** | No mechanism to rotate tokens without redeploying both services. Enterprise uses short-lived tokens (JWT with expiry) or automatic rotation | Tokens are long-lived; compromise means manual rotation + redeploy |
+| **Rate limiting / circuit breaking** | No protection against the dashboard flooding the API. Enterprise uses API gateways (Kong, Envoy) with rate limits per client | A bug in the dashboard could DDoS the API |
+| **Audit logging** | No record of which service made which request. Enterprise logs every API call with caller identity, timestamp, and action | Cannot trace who changed policy or when |
+| **Secrets in env vars** | Tokens stored as Railway env vars (encrypted at rest by Railway, but visible in dashboard). Enterprise uses dedicated secrets managers with access policies and audit trails | Anyone with Railway project access can read all tokens |
+| **Input validation depth** | Basic Pydantic validation on request bodies. Enterprise adds WAF (Web Application Firewall) rules, payload size limits, and schema-level threat detection | Malformed payloads could exploit edge cases in detection logic |
+
+### Why This Is Acceptable for Portfolio
+
+1. **Demonstrates the concept:** Token-based auth with separate API/Admin scopes shows understanding of service-to-service authentication patterns
+2. **Private networking:** Using Railway's internal network for dashboard-to-API communication is the correct architecture -- just missing mTLS
+3. **Layered auth:** The `require_api_token` / `require_admin_token` / `require_metrics_token` separation shows role-based access control thinking
+4. **The gaps are documentable:** In an interview, being able to articulate these gaps and their enterprise solutions demonstrates senior-level security awareness
+
+### Improvement Path (If Moving to Production)
+
+1. **Immediate:** Convert `API_TOKEN` on dashboard to `${{api.API_TOKEN}}` Railway variable reference (single source of truth)
+2. **Short-term:** Add rate limiting middleware to FastAPI (`slowapi` or custom), add structured audit logging
+3. **Medium-term:** Replace static tokens with JWT (short-lived, auto-rotating), add API gateway
+4. **Long-term:** Service mesh (Istio) for mTLS, secrets vault integration, WAF
+
+---
+
 ## Quick Reference
 
 **Master Prompt:** `/Users/omega/Projects/FraudDetection/PRDs/Master Prompt - Fraud Detection.txt`
@@ -315,4 +495,4 @@ Interview preparation materials in Cyrus:
 
 ---
 
-*Last Updated: 2026-01-13*
+*Last Updated: February 08, 2026*

@@ -42,7 +42,7 @@ API_URL = os.getenv("FRAUD_API_URL", "http://localhost:8000")
 API_TOKEN = os.getenv("API_TOKEN", None)
 POSTGRES_URL = os.getenv(
     "POSTGRES_URL",
-    "postgresql://fraud_user:fraud_pass@localhost:5432/fraud_detection"
+    "postgresql://fraud_user:fraud_dev_password@localhost:5432/fraud_detection"
 )
 
 def _api_headers() -> dict[str, str]:

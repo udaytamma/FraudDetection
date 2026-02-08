@@ -39,10 +39,17 @@ st.set_page_config(
 
 # Configuration
 API_URL = os.getenv("FRAUD_API_URL", "http://localhost:8000")
+API_TOKEN = os.getenv("API_TOKEN", None)
 POSTGRES_URL = os.getenv(
     "POSTGRES_URL",
     "postgresql://fraud_user:fraud_pass@localhost:5432/fraud_detection"
 )
+
+def _api_headers() -> dict[str, str]:
+    """Build auth headers for API requests."""
+    if API_TOKEN:
+        return {"X-API-Key": API_TOKEN}
+    return {}
 
 # Dark-mode color constants for Plotly (CSS can't reach Plotly's SVG canvas)
 _DARK_BG = "#1e293b"
@@ -213,7 +220,7 @@ st.markdown("""
 def get_api_health() -> dict:
     """Check API health status."""
     try:
-        response = httpx.get(f"{API_URL}/health", timeout=5.0)
+        response = httpx.get(f"{API_URL}/health", headers=_api_headers(), timeout=5.0)
         if response.status_code == 200:
             return response.json()
     except Exception:
@@ -224,7 +231,7 @@ def get_api_health() -> dict:
 def get_policy_version() -> dict:
     """Get current policy version."""
     try:
-        response = httpx.get(f"{API_URL}/policy/version", timeout=5.0)
+        response = httpx.get(f"{API_URL}/policy/version", headers=_api_headers(), timeout=5.0)
         if response.status_code == 200:
             return response.json()
     except Exception:
@@ -235,7 +242,7 @@ def get_policy_version() -> dict:
 def get_current_policy() -> dict:
     """Get current active policy configuration."""
     try:
-        response = httpx.get(f"{API_URL}/policy", timeout=5.0)
+        response = httpx.get(f"{API_URL}/policy", headers=_api_headers(), timeout=5.0)
         if response.status_code == 200:
             return response.json()
     except Exception:
@@ -246,7 +253,7 @@ def get_current_policy() -> dict:
 def get_policy_versions(limit: int = 50) -> list:
     """Get policy version history."""
     try:
-        response = httpx.get(f"{API_URL}/policy/versions", params={"limit": limit}, timeout=5.0)
+        response = httpx.get(f"{API_URL}/policy/versions", params={"limit": limit}, headers=_api_headers(), timeout=5.0)
         if response.status_code == 200:
             return response.json().get("versions", [])
     except Exception:
@@ -261,6 +268,7 @@ def update_thresholds(updates: list, changed_by: str = "dashboard") -> dict:
             f"{API_URL}/policy/thresholds",
             json=updates,
             params={"changed_by": changed_by},
+            headers=_api_headers(),
             timeout=10.0
         )
         return response.json()
@@ -275,6 +283,7 @@ def add_policy_rule(rule: dict, changed_by: str = "dashboard") -> dict:
             f"{API_URL}/policy/rules",
             json=rule,
             params={"changed_by": changed_by},
+            headers=_api_headers(),
             timeout=10.0
         )
         return response.json()
@@ -289,6 +298,7 @@ def update_policy_rule(rule_id: str, rule: dict, changed_by: str = "dashboard") 
             f"{API_URL}/policy/rules/{rule_id}",
             json=rule,
             params={"changed_by": changed_by},
+            headers=_api_headers(),
             timeout=10.0
         )
         return response.json()
@@ -302,6 +312,7 @@ def delete_policy_rule(rule_id: str, changed_by: str = "dashboard") -> dict:
         response = httpx.delete(
             f"{API_URL}/policy/rules/{rule_id}",
             params={"changed_by": changed_by},
+            headers=_api_headers(),
             timeout=10.0
         )
         return response.json()
@@ -315,6 +326,7 @@ def add_to_policy_list(list_type: str, value: str, changed_by: str = "dashboard"
         response = httpx.post(
             f"{API_URL}/policy/lists/{list_type}",
             params={"value": value, "changed_by": changed_by},
+            headers=_api_headers(),
             timeout=10.0
         )
         return response.json()
@@ -328,6 +340,7 @@ def remove_from_policy_list(list_type: str, value: str, changed_by: str = "dashb
         response = httpx.delete(
             f"{API_URL}/policy/lists/{list_type}/{value}",
             params={"changed_by": changed_by},
+            headers=_api_headers(),
             timeout=10.0
         )
         return response.json()
@@ -341,6 +354,7 @@ def rollback_policy(target_version: str, changed_by: str = "dashboard") -> dict:
         response = httpx.post(
             f"{API_URL}/policy/rollback/{target_version}",
             params={"changed_by": changed_by},
+            headers=_api_headers(),
             timeout=10.0
         )
         return response.json()
@@ -354,6 +368,7 @@ def submit_transaction(payload: dict) -> dict:
         response = httpx.post(
             f"{API_URL}/decide",
             json=payload,
+            headers=_api_headers(),
             timeout=10.0
         )
         if response.status_code == 200:

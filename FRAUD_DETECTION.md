@@ -162,7 +162,7 @@ These are documented as accepted risks for capstone scope:
 
 | Table | Purpose | Data Stored |
 |-------|---------|-------------|
-| `fraud_evidence` | Primary evidence | HMAC-hashed identifiers, scores, decisions, timestamps |
+| `transaction_evidence` | Primary evidence | HMAC-hashed identifiers, scores, decisions, timestamps |
 | `evidence_vault` | Sensitive data | Fernet-encrypted raw identifiers (device ID, IP, fingerprint) |
 
 ### Data Flow
@@ -181,8 +181,9 @@ These are documented as accepted risks for capstone scope:
               │                               │
               ▼                               ▼
     ┌─────────────────┐             ┌─────────────────┐
-    │ fraud_evidence  │             │ evidence_vault  │
-    │ (HMAC hashed)   │             │ (Encrypted)     │
+    │ transaction_    │             │ evidence_vault  │
+    │ evidence        │             │ (Encrypted)     │
+    │ (HMAC hashed)   │             │                 │
     └─────────────────┘             └─────────────────┘
 ```
 
@@ -240,7 +241,7 @@ This is a **PCI-aware** design, not a claim of PCI DSS certification.
 |----------|-------------|---------|---------|
 | Velocity (real-time) | Sliding window counters | Redis ZSET | card_attempts_10m |
 | Aggregates (near real-time) | Incremental updates | Redis Hash | user_chargeback_count |
-| Historical (batch) | Daily rollups | Feast | user_chargeback_rate_90d |
+| Historical (batch) | Daily rollups | Feast (future phase; Redis-only in MVP) | user_chargeback_rate_90d |
 
 ---
 
@@ -277,15 +278,15 @@ Else → ALLOW
 
 ## Failure Modes & Fallbacks
 
-| Component | Failure Mode | Fallback |
-|-----------|--------------|----------|
-| Redis | Node down | Replica failover, then default features |
-| Redis Cluster | Multiple nodes down | Safe mode activation |
-| ML Service | Timeout/crash | Rule-based scoring |
-| Policy Engine | Config error | Hardcoded safe mode rules |
-| Evidence Vault | Write failure | Best-effort, log failure (no retry) |
-| Idempotency (Redis) | Redis unavailable | PostgreSQL fallback |
-| Background Tasks | Task failure | Fire-and-forget (no retry) |
+| Component | Failure Mode | Fallback | Status |
+|-----------|--------------|----------|--------|
+| Redis | Node down | Default features (zeroed counters) | Implemented |
+| Redis | Cluster failover | Replica failover, then safe mode | Future (single-node MVP) |
+| Scoring | N/A | Rule-based only (no ML service yet) | Implemented |
+| Policy Engine | Config error | Returns HTTP 500; retains last valid policy in memory | Implemented |
+| Evidence Vault | Write failure | Best-effort, log failure (no retry) | Implemented |
+| Idempotency (Redis) | Redis unavailable | PostgreSQL fallback | Implemented |
+| Background Tasks | Task failure | Fire-and-forget (no retry) | Implemented |
 
 ### Idempotency Implementation
 

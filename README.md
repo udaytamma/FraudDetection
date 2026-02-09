@@ -240,9 +240,12 @@ FraudDetection/
 │   ├── detection/              # Fraud detectors
 │   │   ├── card_testing.py     # Card testing detection
 │   │   ├── velocity.py         # Velocity rules
-│   │   └── geo_anomaly.py      # Geographic checks
+│   │   ├── geo.py              # Geographic anomaly checks
+│   │   ├── bot.py              # Bot/emulator detection
+│   │   └── detector.py         # Detection engine orchestration
 │   ├── scoring/                # Risk scoring
-│   │   └── scorer.py           # Score aggregation
+│   │   ├── risk_scorer.py      # Risk score aggregation
+│   │   └── friendly_fraud.py   # Friendly fraud scoring
 │   ├── policy/                 # Policy engine
 │   │   └── engine.py           # Rule evaluation
 │   ├── evidence/               # Evidence capture
@@ -349,7 +352,7 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 - Raw device IDs, IPs, and fingerprints are encrypted at rest
 - Primary evidence uses HMAC hashes for analytics without exposing raw values
-- Retention is enforced via scheduled purge script (`scripts/purge_evidence_vault.py`)
+- Retention is enforced via manual purge script (`scripts/purge_evidence_vault.py`); schedule via cron or orchestrator in production
 - This is a PCI-aware design, not a claim of PCI DSS certification
 
 ---
@@ -417,7 +420,7 @@ Available at `/metrics` (token required if set):
 
 - `fraud_decisions_total` - Decision counts by outcome
 - `fraud_e2e_latency_ms` - Decision latency histogram
-- `fraud_signals_total` - Signal trigger counts
+- `fraud_detector_triggers_total` - Signal trigger counts
 - `fraud_policy_version` - Current policy version
 
 ### Grafana Dashboard

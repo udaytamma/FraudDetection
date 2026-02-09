@@ -11,7 +11,7 @@
 | Parameter | Value |
 |-----------|-------|
 | Environment | Local (M-series Mac) |
-| API Workers | 4 uvicorn workers |
+| API Workers | 1 uvicorn worker |
 | Redis | Single node, local Docker |
 | PostgreSQL | Single node, local Docker |
 | Test Tool | Locust |
@@ -138,19 +138,21 @@ What This Doesn't Prove:
 
 **Role:** Reviews flagged transactions, makes manual decisions, investigates patterns
 
+> **Note:** The panels and workflow below describe the *production target*. The current demo dashboard (`dashboard.py`) provides Decision Distribution, Recent High-Risk, and Triggered Reasons. Review Queue, case management, and bulk actions are future scope (see Gap Analysis below).
+
 **Primary Dashboard Panels:**
 
-| Panel | Purpose | Key Metrics |
-|-------|---------|-------------|
-| **Review Queue** | Transactions needing manual decision | Count, age, priority |
-| **Decision Distribution** | Current system behavior | ALLOW/FRICTION/REVIEW/BLOCK % |
-| **Recent High-Risk** | Emerging patterns | Transactions with score >70% |
-| **Triggered Reasons** | Why transactions flagged | Top 10 triggered signals |
+| Panel | Purpose | Key Metrics | MVP Status |
+|-------|---------|-------------|------------|
+| **Review Queue** | Transactions needing manual decision | Count, age, priority | Future scope |
+| **Decision Distribution** | Current system behavior | ALLOW/FRICTION/REVIEW/BLOCK % | Implemented |
+| **Recent High-Risk** | Emerging patterns | Transactions with score >70% | Implemented |
+| **Triggered Reasons** | Why transactions flagged | Top 10 triggered signals | Implemented |
 
-**Workflow:**
+**Workflow (Production Target):**
 
 ```
-1. Check Review Queue
+1. Check Review Queue (future scope)
    └── Sort by priority (HIGH first)
    └── Filter by amount (high value first)
 
@@ -160,7 +162,7 @@ What This Doesn't Prove:
    └── Check customer history
    └── Make decision: APPROVE / DECLINE / ESCALATE
 
-3. Bulk actions:
+3. Bulk actions (future scope):
    └── Add device to blocklist
    └── Add card to blocklist
    └── Flag user for enhanced monitoring

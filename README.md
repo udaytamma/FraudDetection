@@ -115,6 +115,7 @@ The API uses a three-tier token authentication system. All tokens are optionalâ€
 |----------|---------------|-------------|
 | `POST /decide` | API_TOKEN | Make fraud decisions |
 | `POST /chargebacks` | API_TOKEN | Ingest chargeback notifications |
+| `POST /refunds` | API_TOKEN | Ingest refund notifications |
 | `GET /policy/*` | API_TOKEN | Read policy configuration |
 | `PUT/POST /policy/*` | ADMIN_TOKEN | Mutate policy (thresholds, rules) |
 | `GET /metrics` | METRICS_TOKEN | Prometheus metrics |
@@ -229,6 +230,7 @@ Content-Type: application/json
 | GET | `/health` | None | Health check |
 | POST | `/decide` | API_TOKEN | Make fraud decision |
 | POST | `/chargebacks` | API_TOKEN | Ingest chargeback notification |
+| POST | `/refunds` | API_TOKEN | Ingest refund notification |
 | GET | `/metrics` | METRICS_TOKEN | Prometheus metrics |
 | GET | `/metrics/summary` | METRICS_TOKEN | Recent telemetry for dashboards |
 | GET | `/policy` | API_TOKEN | Active policy configuration |

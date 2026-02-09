@@ -321,6 +321,69 @@ class TestChargebackRecording:
         assert result is None
 
 
+class TestRefundRecording:
+    """Tests for refund recording."""
+
+    @pytest.mark.asyncio
+    async def test_record_refund_without_session_returns_none(self):
+        """record_refund should return None if not initialized."""
+        service = EvidenceService(database_url="postgresql+asyncpg://localhost/test")
+
+        result = await service.record_refund(
+            transaction_id="txn_123",
+            refund_id="rf_456",
+            amount_cents=2500,
+        )
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_record_refund_returns_id(self):
+        """record_refund should return a UUID string."""
+        service = EvidenceService(database_url="postgresql+asyncpg://localhost/test")
+
+        mock_session = AsyncMock()
+        mock_session.execute = AsyncMock()
+        mock_session.commit = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+
+        service.session_factory = MagicMock(return_value=mock_session)
+
+        result = await service.record_refund(
+            transaction_id="txn_123",
+            refund_id="rf_456",
+            amount_cents=2500,
+            reason_code="customer_request",
+            reason_description="Customer requested refund",
+        )
+
+        assert result is not None
+        assert len(result) == 36  # UUID format
+        mock_session.execute.assert_called_once()
+        mock_session.commit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_record_refund_handles_db_error(self):
+        """record_refund should return None on database error."""
+        service = EvidenceService(database_url="postgresql+asyncpg://localhost/test")
+
+        mock_session = AsyncMock()
+        mock_session.execute = AsyncMock(side_effect=Exception("DB error"))
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+
+        service.session_factory = MagicMock(return_value=mock_session)
+
+        result = await service.record_refund(
+            transaction_id="txn_123",
+            refund_id="rf_456",
+            amount_cents=2500,
+        )
+
+        assert result is None
+
+
 class TestHealthCheck:
     """Tests for database health check."""
 

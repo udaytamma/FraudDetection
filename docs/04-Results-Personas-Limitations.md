@@ -75,7 +75,7 @@ The current MVP in this repo does not include a historical replay pipeline, and 
 |------------|--------|-----------------|
 | **Synthetic test data** | May not reflect real attack patterns | Shadow deployment on production traffic |
 | **No real chargebacks** | Cannot validate label accuracy | Integrate with PSP chargeback feed |
-| **Refund feed not wired** | Refund abuse signals stay at zero | Add refund ingestion endpoint or batch feed |
+| **Refund feed is manual** | No automated PSP integration | Add streaming/batch refund ingestion |
 | **Limited feature diversity** | May miss real fraud signals | Add external signals (BIN, device reputation) |
 | **No historical baseline** | Cannot compare to existing system | Run parallel with current fraud system |
 | **Point-in-time features untested** | Replay may have leakage | Validate with known delayed labels |

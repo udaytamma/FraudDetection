@@ -243,7 +243,7 @@ This is a **PCI-aware** design, not a claim of PCI DSS certification.
 | Aggregates (near real-time) | Incremental updates | Redis Hash | user_chargeback_count |
 | Historical (batch) | Daily rollups | Feast (future phase; Redis-only in MVP) | user_chargeback_rate_90d |
 
-Refund aggregates are tracked on the user profile (`refund_count_90d`) when refund ingestion is wired into the pipeline.
+Refund aggregates are tracked on the user profile (`refund_count_90d`) via `/refunds` ingestion.
 
 ---
 

@@ -115,6 +115,7 @@ Real-time decisioning foundation with rule-based detection.
 - YAML policy engine with hot-reload
 - Immutable evidence vault
 - Prometheus/Grafana monitoring
+- Chargeback + refund ingestion endpoints (manual feed)
 - Test suite includes 190+ pytest cases; measured 260 RPS at 106ms P99 on a single worker (higher capacity is projected, not measured)
 
 **Current Status:** MVP complete, ready for shadow deployment
@@ -128,7 +129,7 @@ Layer ML scoring while maintaining policy control.
 - Champion/challenger experiment framework
 - Historical replay for threshold simulation
 - Economic optimization UI for business users
-- Automated chargeback ingestion and labeling
+- Automated chargeback + refund ingestion and labeling
 
 **ML Model Specification:**
 - Features: 25+ velocity + behavioral + entity features

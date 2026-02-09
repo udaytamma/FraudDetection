@@ -821,6 +821,49 @@ async def ingest_chargeback(
     }
 
 
+# =============================================================================
+# REFUND INGESTION ENDPOINT
+# =============================================================================
+
+@app.post("/refunds")
+async def ingest_refund(
+    refund: RefundRequest,
+    _: None = Depends(require_api_token),
+):
+    """
+    Ingest a refund notification.
+
+    Records the refund in PostgreSQL and updates user profiles in Redis
+    so that friendly-fraud scoring reflects refund history.
+    """
+    record_id = await evidence_service.record_refund(
+        transaction_id=refund.transaction_id,
+        refund_id=refund.refund_id,
+        amount_cents=refund.amount_cents,
+        reason_code=refund.reason_code,
+        reason_description=refund.reason_description,
+    )
+
+    if not record_id:
+        raise HTTPException(status_code=500, detail="Failed to record refund")
+
+    evidence = await evidence_service.get_evidence(refund.transaction_id)
+
+    if evidence:
+        _fire_and_forget(
+            feature_store.update_refund_profiles(
+                user_id=evidence.get("user_id"),
+            ),
+            "update_refund_profiles",
+        )
+
+    return {
+        "status": "success",
+        "record_id": record_id,
+        "profiles_updated": evidence is not None,
+    }
+
+
 # Entry point for running directly
 if __name__ == "__main__":
     import uvicorn

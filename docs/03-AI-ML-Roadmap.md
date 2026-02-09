@@ -88,6 +88,7 @@ decision = policy_engine.evaluate(event, features, scores)
 | user_account_age_days | Account creation age | Profile |
 | user_chargeback_count_lifetime | Historical chargebacks | Profile |
 | user_chargeback_rate_90d | Recent chargeback rate | Profile |
+| user_refund_count_90d | Recent refunds | Profile |
 | card_distinct_devices_30d | Devices using this card | Redis |
 | card_distinct_users_30d | Users using this card | Redis |
 

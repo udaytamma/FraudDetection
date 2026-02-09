@@ -73,10 +73,10 @@ The current MVP in this repo does not include a historical replay pipeline, and 
 
 | Limitation | Impact | Mitigation Path |
 |------------|--------|-----------------|
-| **Rule-based only** | Lower accuracy than ML | Phase 2 ML integration |
+| **ML performance unverified** | Accuracy unknown on real labels | Run training pipeline on real chargebacks |
 | **No adaptive thresholds** | Static rules don't evolve | Implement threshold optimization |
 | **No feedback loop** | Decisions don't improve system | Add analyst feedback to training |
-| **Single model** | No redundancy or comparison | Champion/challenger framework |
+| **No automated promotion** | Manual model governance | Add promotion automation + guardrails |
 | **No drift detection** | Model may degrade silently | Implement PSI monitoring |
 
 ### Operational Limitations
@@ -102,7 +102,7 @@ What This Proves:
 What This Doesn't Prove:
   ✗ Performance under real production traffic
   ✗ Detection accuracy on real fraud (vs synthetic)
-  ✗ ML model performance (not yet implemented)
+  ✗ ML model performance (pipeline implemented, results not yet measured)
   ✗ Operational readiness (no real incidents yet)
   ✗ Economic impact (no real financial data)
 ```

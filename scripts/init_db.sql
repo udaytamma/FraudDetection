@@ -42,6 +42,9 @@ CREATE TABLE IF NOT EXISTS transaction_evidence (
     risk_score DECIMAL(5,4) NOT NULL,
     criminal_score DECIMAL(5,4),
     friendly_fraud_score DECIMAL(5,4),
+    ml_score DECIMAL(5,4),
+    model_version VARCHAR(64),
+    model_variant VARCHAR(32),
 
     -- Decision made
     decision VARCHAR(20) NOT NULL,
@@ -366,6 +369,20 @@ BEGIN
         ALTER TABLE transaction_evidence ADD COLUMN device_fingerprint_hash VARCHAR(64);
         CREATE INDEX IF NOT EXISTS idx_evidence_device_hash ON transaction_evidence(device_id_hash);
         CREATE INDEX IF NOT EXISTS idx_evidence_ip_hash ON transaction_evidence(ip_address_hash);
+    END IF;
+END $$;
+
+-- Add ML score metadata (Phase 2)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'transaction_evidence'
+        AND column_name = 'ml_score'
+    ) THEN
+        ALTER TABLE transaction_evidence ADD COLUMN ml_score DECIMAL(5,4);
+        ALTER TABLE transaction_evidence ADD COLUMN model_version VARCHAR(64);
+        ALTER TABLE transaction_evidence ADD COLUMN model_variant VARCHAR(32);
     END IF;
 END $$;
 

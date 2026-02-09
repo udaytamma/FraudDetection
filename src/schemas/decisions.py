@@ -134,6 +134,22 @@ class RiskScores(BaseModel):
         description="Bot/automation detection score",
     )
 
+    # Phase 2 ML scoring
+    ml_score: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="ML model score (criminal fraud probability)",
+    )
+    model_version: Optional[str] = Field(
+        default=None,
+        description="Model version used for ML scoring",
+    )
+    model_variant: Optional[str] = Field(
+        default=None,
+        description="Model variant routed (champion/challenger/holdout)",
+    )
+
 
 class FraudDecisionResponse(BaseModel):
     """

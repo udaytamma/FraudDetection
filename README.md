@@ -273,6 +273,10 @@ FraudDetection/
 │   ├── scoring/                # Risk scoring
 │   │   ├── risk_scorer.py      # Risk score aggregation
 │   │   └── friendly_fraud.py   # Friendly fraud scoring
+│   ├── ml/                     # ML scoring + features (Phase 2)
+│   │   ├── features.py         # Feature vectorization
+│   │   ├── registry.py         # Model registry
+│   │   └── scorer.py           # ML scorer + routing
 │   ├── policy/                 # Policy engine
 │   │   └── engine.py           # Rule evaluation
 │   ├── evidence/               # Evidence capture
@@ -283,7 +287,8 @@ FraudDetection/
 │   ├── policy.yaml             # Policy configuration
 │   └── prometheus.yml          # Prometheus config
 ├── scripts/
-│   └── init_db.sql             # Database schema
+│   ├── init_db.sql             # Database schema
+│   └── train_model.py          # Phase 2 training pipeline
 ├── tests/                      # Test suite
 ├── dashboard.py                # Streamlit dashboard
 ├── docker-compose.yml          # Infrastructure
@@ -342,9 +347,18 @@ rules:
 | `METRICS_TOKEN` | Token for `/metrics` and `/metrics/summary` | optional |
 | `SAFE_MODE_ENABLED` | Bypass decisioning | `false` |
 | `SAFE_MODE_DECISION` | ALLOW/BLOCK/REVIEW | `ALLOW` |
+| `ML_ENABLED` | Enable ML scoring (Phase 2) | `false` |
+| `ML_REGISTRY_PATH` | Path to model registry JSON | `models/registry.json` |
+| `ML_CHALLENGER_PERCENT` | Challenger routing percent | `15` |
+| `ML_HOLDOUT_PERCENT` | Holdout routing percent | `5` |
+| `ML_WEIGHT` | ML weight in ensemble | `0.7` |
 | `EVIDENCE_VAULT_KEY` | Encryption key for vault | required for vault |
 | `EVIDENCE_HASH_KEY` | HMAC key for identifiers | required for hashing |
 | `EVIDENCE_RETENTION_DAYS` | Vault retention | `730` |
+
+**ML scoring note:**
+- Run `scripts/train_model.py` to populate `models/registry.json` (champion/challenger).
+- Set `ML_ENABLED=true` to activate ML scoring in the API.
 
 ## Evidence Vault
 
@@ -456,11 +470,13 @@ Emitted in the current MVP:
 - `fraud_e2e_latency_ms` - End-to-end decision latency histogram
 - `fraud_feature_latency_ms` - Feature computation latency histogram
 - `fraud_scoring_latency_ms` - Scoring latency histogram
+- `fraud_model_latency_ms` - ML inference latency histogram (when ML enabled)
 - `fraud_policy_latency_ms` - Policy evaluation latency histogram
 - `fraud_slow_requests_total` - SLA breach counter
 - `fraud_errors_total` - Error counts by type
 - `fraud_cache_hits_total` - Idempotency cache hits
 - `fraud_postgres_latency_ms` - Postgres operation latency (evidence + idempotency)
+- `fraud_model_version_info` - Model version by variant (when ML enabled)
 
 Defined but not yet populated in this codebase:
 - `fraud_cache_misses_total`
@@ -525,9 +541,10 @@ This is a capstone project demonstrating fraud detection architecture. The follo
 
 ## Roadmap
 
-- [ ] ML model integration (XGBoost)
-- [ ] Real-time model serving
-- [ ] A/B testing framework
+- [x] ML model integration (XGBoost + LightGBM)
+- [x] Champion/challenger routing (deterministic)
+- [ ] Automated retraining scheduler
+- [ ] Replay framework
 - [ ] Case management UI
 - [ ] Chargeback feedback loop
 

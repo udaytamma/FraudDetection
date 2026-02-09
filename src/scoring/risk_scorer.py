@@ -11,6 +11,8 @@ Produces:
 - Confidence level
 """
 
+from ..config import settings
+from ..metrics import metrics
 from ..schemas import (
     PaymentEvent,
     FeatureSet,
@@ -25,6 +27,7 @@ from ..detection import (
     BotDetector,
     FriendlyFraudDetector,
 )
+from ..ml import MLScorer
 
 
 class RiskScorer:
@@ -59,6 +62,15 @@ class RiskScorer:
             self.bot,
             self.friendly_fraud,
         ])
+
+        # Optional ML scorer (Phase 2)
+        self.ml_scorer = None
+        if settings.ml_enabled:
+            self.ml_scorer = MLScorer(
+                registry_path=settings.ml_registry_path,
+                challenger_percent=settings.ml_challenger_percent,
+                holdout_percent=settings.ml_holdout_percent,
+            )
 
     async def compute_scores(
         self,
@@ -97,7 +109,36 @@ class RiskScorer:
         ]
 
         weighted_max = max(score * weight for score, weight in criminal_scores)
-        criminal_score = min(1.0, weighted_max)
+        rule_criminal_score = min(1.0, weighted_max)
+
+        # Phase 2: ML score + champion/challenger routing
+        ml_score = None
+        model_version = None
+        model_variant = None
+        if self.ml_scorer:
+            ml_result = self.ml_scorer.score(features, event.idempotency_key)
+            ml_score = ml_result.score
+            model_version = ml_result.model_version
+            model_variant = ml_result.model_variant
+            metrics.model_latency.observe(ml_result.latency_ms)
+            if model_version and model_variant:
+                metrics.model_version_info.labels(
+                    variant=model_variant,
+                    version=model_version,
+                ).set(1)
+
+        if ml_score is not None:
+            combined = (ml_score * settings.ml_weight) + (rule_criminal_score * (1 - settings.ml_weight))
+
+            # Hard overrides for critical signals
+            if features.entity.device_is_emulator:
+                combined = max(combined, 0.95)
+            if features.entity.device_is_rooted:
+                combined = max(combined, 0.9)
+
+            criminal_score = min(1.0, combined)
+        else:
+            criminal_score = rule_criminal_score
 
         # Overall risk score - max of criminal and friendly
         # with adjustment for confidence
@@ -118,6 +159,9 @@ class RiskScorer:
             velocity_score=round(velocity_score, 4),
             geo_score=round(geo_score, 4),
             bot_score=round(bot_score, 4),
+            ml_score=round(ml_score, 4) if ml_score is not None else None,
+            model_version=model_version,
+            model_variant=model_variant,
         ), reasons
 
     def _compute_confidence(

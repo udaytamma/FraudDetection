@@ -16,6 +16,7 @@ Design goals:
 import asyncio
 import time
 from datetime import datetime, timedelta, UTC
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from typing import Optional
 
 import redis.asyncio as redis
@@ -53,6 +54,7 @@ class FeatureStore:
     WINDOW_24H = 86400
     WINDOW_7D = 604800
     WINDOW_30D = 2592000
+    WINDOW_90D = 7776000
 
     def __init__(self, redis_client: redis.Redis):
         """
@@ -143,7 +145,9 @@ class FeatureStore:
             self.velocity.count("card", card_token, "declines", self.WINDOW_1H),
             self.velocity.count_distinct("card", card_token, "accounts", self.WINDOW_24H),
             self.velocity.count_distinct("card", card_token, "devices", self.WINDOW_24H),
+            self.velocity.count_distinct("card", card_token, "devices", self.WINDOW_30D),
             self.velocity.count_distinct("card", card_token, "ips", self.WINDOW_24H),
+            self.velocity.count_distinct("card", card_token, "users", self.WINDOW_30D),
         )
 
         return {
@@ -154,7 +158,9 @@ class FeatureStore:
             "card_declines_1h": results[4],
             "card_distinct_accounts_24h": results[5],
             "card_distinct_devices_24h": results[6],
-            "card_distinct_ips_24h": results[7],
+            "card_distinct_devices_30d": results[7],
+            "card_distinct_ips_24h": results[8],
+            "card_distinct_users_30d": results[9],
         }
 
     async def _get_device_velocity(self, device_id: str) -> dict:
@@ -338,9 +344,14 @@ class FeatureStore:
             account_age_days=int(data.get("account_age_days", 0)),
             risk_tier=data.get("risk_tier", "NORMAL"),
             total_transactions=int(data.get("total_transactions", 0)),
+            transactions_30d=int(data.get("transactions_30d", data.get("total_transactions", 0))),
+            total_amount_cents=int(data.get("total_amount_cents", 0)),
             chargeback_count=int(data.get("chargeback_count", 0)),
             chargeback_count_90d=int(data.get("chargeback_count_90d", 0)),
             refund_count_90d=int(data.get("refund_count_90d", 0)),
+            amount_mean_cents=float(data.get("amount_mean_cents", 0.0)),
+            amount_m2_cents=float(data.get("amount_m2_cents", 0.0)),
+            amount_count=int(data.get("amount_count", 0)),
         )
 
     async def _get_service_profile(self, service_id: str) -> Optional[ServiceProfile]:
@@ -440,23 +451,31 @@ class FeatureStore:
         pipe = self.redis.pipeline()
 
         # Update velocity counters
-        await self.velocity.increment("card", card_token, "attempts", tx_id, now_ms)
+        await self.velocity.increment(
+            "card", card_token, "attempts", tx_id, now_ms, ttl_seconds=self.WINDOW_30D
+        )
 
         if is_decline:
-            await self.velocity.increment("card", card_token, "declines", tx_id, now_ms)
+            await self.velocity.increment(
+                "card", card_token, "declines", tx_id, now_ms, ttl_seconds=self.WINDOW_30D
+            )
 
         # Track distinct entities (service_id replaces merchant_id for telco)
         if event.service_id:
             await self.velocity.add_distinct(
-                "card", card_token, "accounts", event.service_id, now_ms
+                "card", card_token, "accounts", event.service_id, now_ms, ttl_seconds=self.WINDOW_30D
             )
         if event.device and event.device.device_id:
             await self.velocity.add_distinct(
-                "card", card_token, "devices", event.device.device_id, now_ms
+                "card", card_token, "devices", event.device.device_id, now_ms, ttl_seconds=self.WINDOW_30D
             )
         if event.geo and event.geo.ip_address:
             await self.velocity.add_distinct(
-                "card", card_token, "ips", event.geo.ip_address, now_ms
+                "card", card_token, "ips", event.geo.ip_address, now_ms, ttl_seconds=self.WINDOW_30D
+            )
+        if event.user_id:
+            await self.velocity.add_distinct(
+                "card", card_token, "users", event.user_id, now_ms, ttl_seconds=self.WINDOW_30D
             )
 
         # Update profile hash
@@ -464,7 +483,7 @@ class FeatureStore:
         pipe.hsetnx(profile_key, "first_seen", now.isoformat())
         pipe.hset(profile_key, "last_seen", now.isoformat())
         pipe.hincrby(profile_key, "total_transactions", 1)
-        pipe.expire(profile_key, self.WINDOW_30D)
+        pipe.expire(profile_key, self.WINDOW_90D)
 
         if event.geo and event.geo.latitude is not None and event.geo.longitude is not None:
             pipe.hset(profile_key, "last_geo_seen", now.isoformat())
@@ -486,15 +505,17 @@ class FeatureStore:
         pipe = self.redis.pipeline()
 
         # Update velocity counters
-        await self.velocity.increment("device", device_id, "attempts", tx_id, now_ms)
+        await self.velocity.increment(
+            "device", device_id, "attempts", tx_id, now_ms, ttl_seconds=self.WINDOW_30D
+        )
 
         # Track distinct cards and users
         await self.velocity.add_distinct(
-            "device", device_id, "cards", event.card_token, now_ms
+            "device", device_id, "cards", event.card_token, now_ms, ttl_seconds=self.WINDOW_30D
         )
         if event.user_id:
             await self.velocity.add_distinct(
-                "device", device_id, "users", event.user_id, now_ms
+                "device", device_id, "users", event.user_id, now_ms, ttl_seconds=self.WINDOW_30D
             )
 
         # Update profile hash
@@ -511,7 +532,7 @@ class FeatureStore:
             pipe.hset(profile_key, "last_country", event.geo.country_code or "")
             pipe.hset(profile_key, "last_city", event.geo.city or "")
 
-        pipe.expire(profile_key, self.WINDOW_30D)
+        pipe.expire(profile_key, self.WINDOW_90D)
         await pipe.execute()
 
     async def _update_ip(
@@ -527,11 +548,13 @@ class FeatureStore:
         pipe = self.redis.pipeline()
 
         # Update velocity counters
-        await self.velocity.increment("ip", ip_address, "attempts", tx_id, now_ms)
+        await self.velocity.increment(
+            "ip", ip_address, "attempts", tx_id, now_ms, ttl_seconds=self.WINDOW_30D
+        )
 
         # Track distinct cards
         await self.velocity.add_distinct(
-            "ip", ip_address, "cards", event.card_token, now_ms
+            "ip", ip_address, "cards", event.card_token, now_ms, ttl_seconds=self.WINDOW_30D
         )
 
         # Update profile hash
@@ -565,12 +588,18 @@ class FeatureStore:
         pipe = self.redis.pipeline()
 
         # Update velocity counters
-        await self.velocity.increment("user", user_id, "transactions", tx_id, now_ms)
+        await self.velocity.increment(
+            "user", user_id, "transactions", tx_id, now_ms, ttl_seconds=self.WINDOW_30D
+        )
 
         # Track distinct cards
         await self.velocity.add_distinct(
-            "user", user_id, "cards", event.card_token, now_ms
+            "user", user_id, "cards", event.card_token, now_ms, ttl_seconds=self.WINDOW_30D
         )
+        if event.device_id:
+            await self.velocity.add_distinct(
+                "user", user_id, "devices", event.device_id, now_ms, ttl_seconds=self.WINDOW_30D
+            )
 
         # Update amount counter
         amount_key = f"{self.prefix}user:{user_id}:amount_24h"
@@ -579,16 +608,59 @@ class FeatureStore:
 
         # Update profile hash
         profile_key = f"{self.prefix}profile:user:{user_id}"
+        amount_count, amount_mean, amount_m2 = await self._update_amount_stats(
+            profile_key, event.amount_cents
+        )
         pipe.hsetnx(profile_key, "first_transaction", now.isoformat())
         pipe.hset(profile_key, "last_transaction", now.isoformat())
         pipe.hincrby(profile_key, "total_transactions", 1)
+        pipe.hincrby(profile_key, "transactions_30d", 1)
         pipe.hincrby(profile_key, "total_amount_cents", event.amount_cents)
+        pipe.hset(profile_key, "amount_count", amount_count)
+        pipe.hset(profile_key, "amount_mean_cents", amount_mean)
+        pipe.hset(profile_key, "amount_m2_cents", amount_m2)
 
         if event.account_age_days is not None:
             pipe.hset(profile_key, "account_age_days", event.account_age_days)
 
         pipe.expire(profile_key, self.WINDOW_30D)
         await pipe.execute()
+
+    async def _update_amount_stats(
+        self,
+        profile_key: str,
+        amount_cents: int,
+    ) -> tuple[int, float, float]:
+        """
+        Update running mean/variance (Welford) for transaction amounts.
+
+        Returns updated (count, mean, m2).
+        """
+        existing = await self.redis.hmget(
+            profile_key,
+            "amount_count",
+            "amount_mean_cents",
+            "amount_m2_cents",
+        )
+
+        def _to_float(value: Optional[bytes]) -> float:
+            if value is None:
+                return 0.0
+            if isinstance(value, bytes):
+                return float(value.decode("utf-8"))
+            return float(value)
+
+        count = int(_to_float(existing[0]) if existing[0] is not None else 0)
+        mean = _to_float(existing[1])
+        m2 = _to_float(existing[2])
+
+        count += 1
+        delta = amount_cents - mean
+        mean += delta / count
+        delta2 = amount_cents - mean
+        m2 += delta * delta2
+
+        return count, round(mean, 4), round(m2, 4)
 
     async def _update_service(
         self,
@@ -603,7 +675,9 @@ class FeatureStore:
         pipe = self.redis.pipeline()
 
         # Track velocity for service (basic)
-        await self.velocity.increment("service", service_id, "transactions", tx_id, now_ms)
+        await self.velocity.increment(
+            "service", service_id, "transactions", tx_id, now_ms, ttl_seconds=self.WINDOW_30D
+        )
 
         profile_key = f"{self.prefix}profile:service:{service_id}"
         pipe.hsetnx(profile_key, "first_seen", now.isoformat())
@@ -637,10 +711,12 @@ class FeatureStore:
         if card_token:
             key = f"{self.prefix}profile:card:{card_token}"
             pipe.hincrby(key, "chargeback_count", 1)
+            pipe.expire(key, self.WINDOW_90D)
         if user_id:
             key = f"{self.prefix}profile:user:{user_id}"
             pipe.hincrby(key, "chargeback_count", 1)
             pipe.hincrby(key, "chargeback_count_90d", 1)
+            pipe.expire(key, self.WINDOW_90D)
         await pipe.execute()
 
     # =========================================================================
@@ -663,6 +739,7 @@ class FeatureStore:
         pipe = self.redis.pipeline()
         key = f"{self.prefix}profile:user:{user_id}"
         pipe.hincrby(key, "refund_count_90d", 1)
+        pipe.expire(key, self.WINDOW_90D)
         await pipe.execute()
 
     # =========================================================================
@@ -687,29 +764,100 @@ class FeatureStore:
         Returns:
             Complete FeatureSet
         """
-        # Compute velocity and entity features in parallel
+        # Compute velocity, profiles, and relationship flags in parallel
         velocity_task = self.compute_velocity_features(event)
         profiles_task = self.get_entity_profiles(event)
+        relation_task = self._get_relationship_flags(event)
 
-        velocity_features, profiles = await asyncio.gather(
-            velocity_task, profiles_task
+        velocity_features, profiles, relation_flags = await asyncio.gather(
+            velocity_task, profiles_task, relation_task
         )
 
         # Build entity features from profiles
         entity_features = self._build_entity_features(event, profiles)
+        if relation_flags:
+            entity_features.card_user_match = relation_flags.get("card_user_match", True)
+            entity_features.device_user_match = relation_flags.get("device_user_match", True)
 
         # Build complete feature set
+        amount_zscore = self._compute_amount_zscore(event, profiles, velocity_features)
+        hour_of_day, is_weekend = self._derive_time_features(event)
+        is_new_card_for_user = not entity_features.card_user_match
+        is_new_device_for_user = not entity_features.device_user_match
+
         return FeatureSet(
             velocity=velocity_features,
             entity=entity_features,
             amount_cents=event.amount_cents,
+            amount_usd=round(event.amount_cents / 100, 2) if event.amount_cents else 0.0,
+            amount_zscore=amount_zscore,
             is_high_value=event.is_high_value,
             is_recurring=event.is_recurring,
             has_3ds=event.has_3ds,
             channel=event.channel,
+            hour_of_day=hour_of_day,
+            is_weekend=is_weekend,
+            is_new_card_for_user=is_new_card_for_user,
+            is_new_device_for_user=is_new_device_for_user,
             avs_match=self._check_avs(event),
             cvv_match=self._check_cvv(event),
         )
+
+    async def _get_relationship_flags(self, event: PaymentEvent) -> dict[str, bool]:
+        """Determine whether the user has seen the card/device recently."""
+        flags: dict[str, bool] = {}
+        if event.user_id and event.card_token:
+            flags["card_user_match"] = await self.velocity.has_distinct(
+                "card", event.card_token, "users", event.user_id, window_seconds=self.WINDOW_30D
+            )
+        if event.user_id and event.device_id:
+            flags["device_user_match"] = await self.velocity.has_distinct(
+                "device", event.device_id, "users", event.user_id, window_seconds=self.WINDOW_30D
+            )
+        return flags
+
+    @staticmethod
+    def _derive_time_features(event: PaymentEvent) -> tuple[int, bool]:
+        """Derive hour-of-day and weekend flags from event timestamp."""
+        ts = event.timestamp
+        if event.device and event.device.timezone:
+            try:
+                ts = ts.astimezone(ZoneInfo(event.device.timezone))
+            except ZoneInfoNotFoundError:
+                pass
+        hour = ts.hour
+        is_weekend = ts.weekday() >= 5
+        return hour, is_weekend
+
+    @staticmethod
+    def _compute_amount_zscore(
+        event: PaymentEvent,
+        profiles: EntityProfiles,
+        velocity: VelocityFeatures,
+    ) -> float:
+        """
+        Compute an approximate amount z-score against user history.
+
+        Uses running mean/variance when available; otherwise falls back to
+        24h average with a conservative standard deviation.
+        """
+        amount = float(event.amount_cents or 0)
+        mean = None
+        std = None
+
+        if profiles.user and profiles.user.amount_count >= 2:
+            mean = profiles.user.amount_mean_cents
+            variance = profiles.user.amount_m2_cents / max(profiles.user.amount_count - 1, 1)
+            std = variance ** 0.5
+
+        if mean is None or std is None or std <= 0:
+            avg_24h = 0.0
+            if velocity.user_transactions_24h > 0:
+                avg_24h = velocity.user_amount_24h_cents / velocity.user_transactions_24h
+            mean = avg_24h
+            std = max(avg_24h, 1.0)
+
+        return round((amount - mean) / std, 4)
 
     def _build_entity_features(
         self,
@@ -723,6 +871,7 @@ class FeatureStore:
         if profiles.card:
             card = profiles.card
             features.card_age_days = (datetime.now(UTC) - card.first_seen).days
+            features.card_age_hours = int((datetime.now(UTC) - card.first_seen).total_seconds() / 3600)
             features.card_total_transactions = card.total_transactions
             features.card_chargeback_count = card.chargeback_count
             features.card_is_new = card.total_transactions == 0
@@ -736,6 +885,7 @@ class FeatureStore:
         if profiles.device:
             device = profiles.device
             features.device_age_days = (datetime.now(UTC) - device.first_seen).days
+            features.device_age_hours = int((datetime.now(UTC) - device.first_seen).total_seconds() / 3600)
             features.device_is_emulator = device.is_emulator
             features.device_is_rooted = device.is_rooted
             features.device_total_transactions = device.total_transactions
@@ -753,12 +903,16 @@ class FeatureStore:
             features.ip_is_tor = ip.is_tor
             features.ip_country_code = ip.country_code
             features.ip_total_transactions = ip.total_transactions
+            features.ip_risk_score = self._derive_ip_risk_score(ip.is_datacenter, ip.is_vpn, ip.is_tor, ip.is_proxy)
         elif event.geo:
             features.ip_is_datacenter = event.geo.is_datacenter
             features.ip_is_vpn = event.geo.is_vpn
             features.ip_is_proxy = event.geo.is_proxy
             features.ip_is_tor = event.geo.is_tor
             features.ip_country_code = event.geo.country_code
+            features.ip_risk_score = self._derive_ip_risk_score(
+                event.geo.is_datacenter, event.geo.is_vpn, event.geo.is_tor, event.geo.is_proxy
+            )
 
         # User features
         if profiles.user:
@@ -770,6 +924,7 @@ class FeatureStore:
             features.user_chargeback_count = user.chargeback_count
             features.user_chargeback_count_90d = user.chargeback_count_90d
             features.user_refund_count_90d = user.refund_count_90d
+            features.user_chargeback_rate_90d = user.chargeback_rate_90d
         else:
             features.user_is_new = True
             features.user_is_guest = event.is_guest
@@ -788,6 +943,25 @@ class FeatureStore:
         features.ip_country_card_country_match = self._check_country_match(event, profiles)
 
         return features
+
+    @staticmethod
+    def _derive_ip_risk_score(
+        is_datacenter: bool,
+        is_vpn: bool,
+        is_tor: bool,
+        is_proxy: bool,
+    ) -> float:
+        """Derive a simple IP risk score from network flags."""
+        score = 0.0
+        if is_datacenter:
+            score += 0.5
+        if is_vpn:
+            score += 0.3
+        if is_proxy:
+            score += 0.2
+        if is_tor:
+            score += 0.7
+        return min(score, 1.0)
 
     def _check_avs(self, event: PaymentEvent) -> bool:
         """Check if AVS verification passed."""

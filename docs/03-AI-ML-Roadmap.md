@@ -21,9 +21,10 @@ The MVP implementation uses a **rule-based detection engine** with hooks for ML 
 | **Feature Engine** | Complete | Redis velocity counters with sliding windows |
 | **Detection Engine** | Complete | 5 detector types (card testing, velocity, geo, bot, friendly) |
 | **Risk Scoring** | Complete | Rule-based combination of detector signals |
+| **ML Scoring** | Implemented (gated) | XGBoost/LightGBM scoring with champion/challenger routing when enabled |
 | **Policy Engine** | Complete | YAML configuration with hot-reload |
 | **Evidence Vault** | Complete | Immutable storage with feature snapshots |
-| **Metrics Pipeline** | Complete | Prometheus metrics for requests/latency/decisions; additional metrics defined but not yet populated |
+| **Metrics Pipeline** | Complete | Prometheus metrics for requests/latency/decisions; model latency/version metrics emitted when ML enabled |
 | **Load Testing** | Complete | Measured 260 RPS at 106ms P99 (single worker; projections are modeled, not measured) |
 
 #### Detection Logic (Current)
@@ -52,6 +53,8 @@ decision = policy_engine.evaluate(event, features, scores)
 
 ## Phase 2: Hybrid ML + Rules
 
+Phase 2 is implemented in-process and gated by `ML_ENABLED`. When disabled, the system runs rule-only scoring.
+
 ### ML Model Specification
 
 #### Criminal Fraud Model
@@ -60,7 +63,7 @@ decision = policy_engine.evaluate(event, features, scores)
 |-----------|---------------|
 | **Algorithm** | XGBoost (primary), LightGBM (challenger) |
 | **Objective** | Binary classification (is_criminal_fraud) |
-| **Training Window** | 90 days of transactions with 120-day label maturity |
+| **Training Window** | 90-day window ending at label-maturity cutoff (default T-120d) |
 | **Retraining Frequency** | Weekly (automated pipeline) |
 | **Feature Count** | 25+ features |
 | **Target AUC** | >0.85 |
@@ -77,7 +80,7 @@ decision = policy_engine.evaluate(event, features, scores)
 | device_distinct_cards_1h | Unique cards on device | 1 hour |
 | device_distinct_cards_24h | Unique cards on device | 24 hours |
 | ip_distinct_cards_1h | Unique cards from IP | 1 hour |
-| user_total_amount_24h | Total spend by user | 24 hours |
+| user_amount_24h_cents | Total spend by user (cents) | 24 hours |
 | card_decline_rate_1h | Decline rate for card | 1 hour |
 
 **Entity Features (From profiles):**
@@ -99,7 +102,7 @@ decision = policy_engine.evaluate(event, features, scores)
 | amount_zscore | Amount vs user average | (amount - avg) / std |
 | is_new_card_for_user | First time card used | Boolean |
 | is_new_device_for_user | First time device used | Boolean |
-| hour_of_day | Local time hour | Timezone adjusted |
+| hour_of_day | Local hour (device timezone if provided; UTC fallback) | Timezone adjusted |
 | is_weekend | Weekend flag | Boolean |
 
 **Device/Network Features:**
@@ -110,7 +113,7 @@ decision = policy_engine.evaluate(event, features, scores)
 | is_datacenter_ip | IP from cloud provider | IP intelligence |
 | is_vpn | VPN detected | IP intelligence |
 | is_tor | Tor exit node | IP intelligence |
-| ip_risk_score | Third-party IP score | External API |
+| ip_risk_score | Derived IP risk score (or external score when available) | IP intelligence flags |
 
 #### Label Source
 
@@ -118,8 +121,9 @@ decision = policy_engine.evaluate(event, features, scores)
 Label Definition:
   is_criminal_fraud = TRUE if:
     - Chargeback received with reason code in [10.1, 10.2, 10.3, 10.4, 10.5]
-    - OR TC40/SAFE issuer alert received
-    - OR manual review classified as fraud
+    - OR chargeback fraud_type = CRIMINAL
+    - (Planned) TC40/SAFE issuer alert received
+    - (Planned) manual review classified as fraud
 
   Label Maturity: 120 days from transaction
     - Reason: Chargebacks can arrive up to 120 days post-transaction
@@ -130,12 +134,12 @@ Label Definition:
 
 ```
 Weekly Pipeline (Automated):
-1. Extract transactions from T-120d to T-30d
+1. Extract transactions from a 90-day window ending at the maturity cutoff (default T-120d)
 2. Join with chargeback outcomes
 3. Retrieve point-in-time features from evidence vault
 4. Train new model version
-5. Validate against holdout (last 7 days)
-6. If AUC drop < 2%: Register as challenger
+5. Validate against holdout (last 7 days of the window)
+6. If AUC drop < 2%: Register as challenger (or keep champion)
 7. If AUC drop >= 2%: Alert DS team, use previous model
 
 Monthly Review (Manual):
@@ -144,6 +148,8 @@ Monthly Review (Manual):
 3. Review false positive cases
 4. Decide: promote challenger or retrain with adjustments
 ```
+
+Implementation note: the pipeline is implemented in `scripts/train_model.py` and can be scheduled externally.
 
 ### Champion/Challenger Framework
 
@@ -164,7 +170,7 @@ Traffic Routing:
    │ Model A │       │ Model B │       │Rules Only│
    └─────────┘       └─────────┘       └─────────┘
 
-Routing: Deterministic hash on auth_id (reproducible)
+Routing: Deterministic hash on idempotency_key (reproducible)
 ```
 
 #### Experiment Metrics
@@ -407,9 +413,9 @@ class EnsembleScoringService:
 | Phase | Scope | Status | Timeline |
 |-------|-------|--------|----------|
 | **Phase 1** | Rule-based MVP | Complete | Done |
-| **Phase 2a** | ML model training | Not started | Weeks 1-2 |
-| **Phase 2b** | Champion/challenger | Not started | Weeks 2-3 |
-| **Phase 2c** | ML in production | Not started | Week 4+ |
+| **Phase 2a** | ML model training | Implemented (manual run) | Weeks 1-2 |
+| **Phase 2b** | Champion/challenger | Implemented (routing + registry) | Weeks 2-3 |
+| **Phase 2c** | ML in production | Implemented (gated by `ml_enabled`) | Week 4+ |
 | **Phase 3** | Advanced ML | Future | TBD |
 
 ---
@@ -418,14 +424,14 @@ class EnsembleScoringService:
 
 **When asked "What's the AI/ML roadmap?":**
 
-> "The current implementation is rule-based by design - we prioritized getting to market fast with interpretable decisions. But the architecture is ML-ready: features are captured in the evidence vault, the scoring service has a clean interface for model integration, and we plan a replay framework for validation (not implemented in the MVP).
+> "The MVP started rule-based to move fast with interpretable decisions, and Phase 2 is now implemented behind a feature flag. The system captures features in the evidence vault, includes a training pipeline, and supports champion/challenger routing via deterministic hashing. Replay tooling is still planned.
 >
-> Phase 2 introduces a simple ML model - XGBoost for criminal fraud - using 25+ features from velocity counters and entity profiles. Labels come from chargebacks with a 120-day maturity window. We'll deploy via champion/challenger: 80% to the proven rules, 15% to the ML challenger, 5% holdout.
+> Phase 2 adds an XGBoost criminal-fraud model (with LightGBM as challenger) using 25+ features from velocity counters and entity profiles. Labels come from chargebacks with a 120-day maturity window. We deploy via champion/challenger routing by default (80% champion, 15% challenger, 5% holdout).
 >
-> Key to success is the ensemble approach: ML informs, but rules have hard overrides for signals like emulators or blocklist matches. This keeps the system interpretable for compliance while improving detection accuracy.
+> The ensemble approach remains: ML informs, but rules have hard overrides for signals like emulators or blocklist matches. This keeps the system interpretable for compliance while improving detection accuracy.
 >
-> Retraining is weekly and automated, but promotion requires 14 days of data and statistically significant improvement before we graduate a challenger to champion."
+> Retraining is weekly via the pipeline script, and promotion still requires 14 days of data and statistically significant improvement before we graduate a challenger to champion."
 
 ---
 
-*This document consolidates the AI/ML strategy with explicit current status, avoiding the impression that ML is already deployed when it's planned for Phase 2.*
+*This document consolidates the AI/ML strategy with explicit current status, including what is implemented and what remains planned (replay tooling, automated scheduling).* 

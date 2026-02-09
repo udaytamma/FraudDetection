@@ -188,6 +188,28 @@ class VelocityCounter:
         results = await pipe.execute()
         return results[0]
 
+    async def has_distinct(
+        self,
+        entity_type: str,
+        entity_id: str,
+        metric: str,
+        value: str,
+        window_seconds: Optional[int] = None,
+    ) -> bool:
+        """
+        Check if a distinct value exists in the counter.
+
+        Returns True if the value has been observed within the TTL window.
+        """
+        key = self._make_key(entity_type, entity_id, metric)
+        score = await self.redis.zscore(key, value)
+        if score is None:
+            return False
+        if window_seconds is None:
+            return True
+        now_ms = int(time.time() * 1000)
+        return score >= now_ms - (window_seconds * 1000)
+
     async def cleanup_expired(
         self,
         entity_type: str,

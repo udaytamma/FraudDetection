@@ -197,6 +197,36 @@ class Settings(BaseSettings):
     )
 
     # =========================================================================
+    # ML Scoring (Phase 2)
+    # =========================================================================
+    ml_enabled: bool = Field(
+        default=False,
+        description="Enable ML scoring (Phase 2)"
+    )
+    ml_registry_path: str = Field(
+        default="models/registry.json",
+        description="Path to model registry JSON"
+    )
+    ml_challenger_percent: int = Field(
+        default=15,
+        ge=0,
+        le=100,
+        description="Percent of traffic routed to challenger model"
+    )
+    ml_holdout_percent: int = Field(
+        default=5,
+        ge=0,
+        le=100,
+        description="Percent of traffic held out (rules only)"
+    )
+    ml_weight: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Weight of ML score in ensemble (0-1)"
+    )
+
+    # =========================================================================
     # Evidence Vault / Compliance
     # =========================================================================
     evidence_vault_key: str | None = Field(

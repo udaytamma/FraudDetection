@@ -53,7 +53,7 @@ Implementation note: exactly-once decision responses are enforced via Redis + Po
 
 ## Capstone Scope & Intent
 
-This repository intentionally implements a **capstone MVP** that demonstrates end‑to‑end decisioning, evidence capture, and policy management with minimal infrastructure. The Kafka/Flink/Feast/OPA/Seldon architecture described below is a **target reference design** for Phase 2, not a claim of current implementation.
+This repository implements a **capstone MVP** that demonstrates end‑to‑end decisioning, evidence capture, and policy management with minimal infrastructure, plus Phase 2 ML scoring/training in-process behind a feature flag. The Kafka/Flink/Feast/OPA/Seldon stack described below remains a **target reference design** for scaled production, not a claim of current implementation here.
 
 ---
 
@@ -67,9 +67,10 @@ This repository intentionally implements a **capstone MVP** that demonstrates en
 | State Store | Redis | Low-latency velocity counters + entity profiles |
 | Evidence Store | PostgreSQL | Structured evidence + audit trail |
 | Policy Engine | YAML + custom evaluator | Hot-reloadable and versioned for demo |
+| ML Scoring (Phase 2) | XGBoost + LightGBM (gated) | In-process scoring + champion/challenger routing |
 | Monitoring | Prometheus client + in-app `/metrics` | Lightweight metrics for demo |
 
-### Target Architecture (Phase 2, Not Implemented)
+### Target Architecture (Phase 2 Reference)
 
 | Component | Technology | Why Selected |
 |-----------|------------|--------------|
@@ -402,8 +403,8 @@ Production recommendation: Use Celery or similar task queue with retry and DLQ.
 
 - Automated representment
 - Economic optimization UI
-- Champion/challenger A/B testing
-- Model retraining pipeline
+- Champion/challenger routing (implemented; gated by `ml_enabled`)
+- Model retraining pipeline (implemented via `scripts/train_model.py`)
 
 ### Phase 3: Extended Detection
 

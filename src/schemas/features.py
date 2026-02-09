@@ -59,6 +59,14 @@ class VelocityFeatures(BaseModel):
         default=0,
         description="Distinct IPs for card in last 24 hours",
     )
+    card_distinct_devices_30d: int = Field(
+        default=0,
+        description="Distinct devices for card in last 30 days",
+    )
+    card_distinct_users_30d: int = Field(
+        default=0,
+        description="Distinct users for card in last 30 days",
+    )
 
     # ==========================================================================
     # Mobile-Specific Velocity Features
@@ -190,6 +198,10 @@ class EntityFeatures(BaseModel):
         default=None,
         description="Days since card was first seen",
     )
+    card_age_hours: Optional[int] = Field(
+        default=None,
+        description="Hours since card was first seen",
+    )
     card_total_transactions: int = Field(
         default=0,
         description="Total card transactions (all time)",
@@ -221,6 +233,10 @@ class EntityFeatures(BaseModel):
     device_age_days: Optional[int] = Field(
         default=None,
         description="Days since device was first seen",
+    )
+    device_age_hours: Optional[int] = Field(
+        default=None,
+        description="Hours since device was first seen",
     )
     device_is_emulator: bool = Field(
         default=False,
@@ -257,6 +273,10 @@ class EntityFeatures(BaseModel):
     ip_is_tor: bool = Field(
         default=False,
         description="IP is a Tor exit node",
+    )
+    ip_risk_score: float = Field(
+        default=0.0,
+        description="Derived IP risk score from network flags",
     )
     ip_country_code: Optional[str] = Field(
         default=None,
@@ -309,6 +329,10 @@ class EntityFeatures(BaseModel):
     user_chargeback_count_90d: int = Field(
         default=0,
         description="User chargebacks in last 90 days",
+    )
+    user_chargeback_rate_90d: float = Field(
+        default=0.0,
+        description="User chargeback rate in last 90 days",
     )
     user_refund_count_90d: int = Field(
         default=0,
@@ -382,6 +406,14 @@ class FeatureSet(BaseModel):
         default=0,
         description="Transaction amount in cents",
     )
+    amount_usd: float = Field(
+        default=0.0,
+        description="Transaction amount in USD",
+    )
+    amount_zscore: float = Field(
+        default=0.0,
+        description="Amount deviation vs. user average (approx z-score)",
+    )
     is_high_value: bool = Field(
         default=False,
         description="Transaction exceeds high-value threshold",
@@ -397,6 +429,22 @@ class FeatureSet(BaseModel):
     channel: Optional[str] = Field(
         default=None,
         description="Transaction channel",
+    )
+    hour_of_day: int = Field(
+        default=0,
+        description="Local hour of day for transaction (0-23)",
+    )
+    is_weekend: bool = Field(
+        default=False,
+        description="True if transaction occurred on weekend",
+    )
+    is_new_card_for_user: bool = Field(
+        default=False,
+        description="True if card has not been used by this user recently",
+    )
+    is_new_device_for_user: bool = Field(
+        default=False,
+        description="True if device has not been used by this user recently",
     )
 
     # Service-level features (Telco-specific)

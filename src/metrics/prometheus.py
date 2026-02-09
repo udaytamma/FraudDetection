@@ -71,6 +71,13 @@ class FraudMetrics:
             buckets=[5, 10, 15, 20, 25, 35, 50],
         )
 
+        # ML model inference latency (Phase 2)
+        self.model_latency = Histogram(
+            "fraud_model_latency_ms",
+            "ML model inference latency in milliseconds",
+            buckets=[1, 2, 5, 10, 15, 20, 25, 35, 50],
+        )
+
         # Policy evaluation latency
         self.policy_latency = Histogram(
             "fraud_policy_latency_ms",
@@ -174,6 +181,13 @@ class FraudMetrics:
         self.policy_version_info = Gauge(
             "fraud_policy_version",
             "Current policy version (hash as value)",
+        )
+
+        # Model version tracking
+        self.model_version_info = Gauge(
+            "fraud_model_version_info",
+            "Active model versions by variant",
+            labelnames=["variant", "version"],
         )
 
 

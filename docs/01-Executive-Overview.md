@@ -87,7 +87,7 @@ A mid-size Telco/MSP operator faces significant payment fraud exposure across SI
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | **Streaming vs. Batch** | Real-time API | Velocity attacks complete in minutes |
-| **ML vs. Rules (Phase 1)** | Rule-based with ML hooks | Faster to market, interpretable |
+| **ML vs. Rules** | Rule-based + ML ensemble (gated) | Faster to market, interpretable |
 | **Feature Store** | Redis velocity counters | Sub-ms lookups, sliding windows |
 | **Policy Engine** | YAML + hot-reload | Business can adjust without deploys |
 | **Evidence Storage** | PostgreSQL (immutable) | Dispute representment requirement |
@@ -106,7 +106,7 @@ A mid-size Telco/MSP operator faces significant payment fraud exposure across SI
 
 ### Phase 1: MVP (Sprint 1-2) - COMPLETE
 
-Real-time decisioning foundation with rule-based detection.
+Real-time decisioning foundation with rule-based detection and gated ML scoring.
 
 **Deliverables:**
 - Decision API with <200ms P99 latency
@@ -122,20 +122,20 @@ Real-time decisioning foundation with rule-based detection.
 
 ### Phase 2: Hybrid ML + Experiments (Sprint 3-4)
 
-Layer ML scoring while maintaining policy control.
+Layer ML scoring while maintaining policy control (implemented behind `ML_ENABLED`).
 
 **Deliverables:**
-- XGBoost/LightGBM criminal fraud model
-- Champion/challenger experiment framework
-- Historical replay for threshold simulation
+- XGBoost/LightGBM criminal fraud model (implemented)
+- Champion/challenger routing framework (implemented)
+- Historical replay for threshold simulation (planned)
 - Economic optimization UI for business users
 - Automated chargeback + refund ingestion and labeling
 
 **ML Model Specification:**
 - Features: 25+ velocity + behavioral + entity features
 - Labels: Chargebacks linked with 120-day maturity window
-- Training: Weekly retraining with point-in-time features
-- Deployment: Shadow mode first, then 10% traffic ramp
+- Training: Weekly retraining with point-in-time features (pipeline implemented; scheduler TBD)
+- Deployment: Shadow mode first; traffic split configurable (default 80/15/5)
 
 ### Phase 3: Scale & External Signals (Sprint 5-6)
 
@@ -201,9 +201,9 @@ Production hardening and expanded detection.
 
 **Next Actions:**
 1. Shadow deployment to production traffic (week 1)
-2. ML model training with labeled historical data (weeks 1-2)
-3. Champion/challenger framework implementation (weeks 2-3)
-4. 10% traffic experiment with ML scoring (week 4)
+2. Run ML training pipeline with labeled historical data (weeks 1-2)
+3. Enable champion/challenger routing in shadow mode (weeks 2-3)
+4. Gradual traffic experiment with ML scoring (default 80/15/5 split)
 
 ---
 

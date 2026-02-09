@@ -339,6 +339,18 @@ class UserProfile(BaseModel):
         default=0,
         description="Total spend in last 30 days (cents)",
     )
+    amount_mean_cents: float = Field(
+        default=0.0,
+        description="Running mean of transaction amount (cents)",
+    )
+    amount_m2_cents: float = Field(
+        default=0.0,
+        description="Running M2 for variance (cents^2)",
+    )
+    amount_count: int = Field(
+        default=0,
+        description="Number of transactions used for amount stats",
+    )
 
     # Card usage
     distinct_cards_30d: int = Field(

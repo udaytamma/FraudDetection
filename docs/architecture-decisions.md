@@ -1,6 +1,6 @@
-# FraudDetection Capstone Fixes (Critical/High/Medium)
+# Architecture Decision Records
 
-This document records each fix applied, with rationale, alternatives, and accepted risks.
+Key design decisions with rationale, alternatives considered, and accepted risks.
 
 ## 1) Auth/RBAC, CORS, Metrics Exposure
 - From → To: Open CORS + no auth on `/decide` and policy mutation + standalone metrics port → token-gated API (`API_TOKEN`, `ADMIN_TOKEN`, `METRICS_TOKEN`), CORS allowlist from settings, `/metrics` served via FastAPI, external metrics server disabled by default.

@@ -306,6 +306,36 @@ BEGIN
     END IF;
 END $$;
 
+-- Add service_id and service_name columns (added in v1.1 schema)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'transaction_evidence'
+        AND column_name = 'service_id'
+    ) THEN
+        ALTER TABLE transaction_evidence ADD COLUMN service_id VARCHAR(64);
+        ALTER TABLE transaction_evidence ADD COLUMN service_name VARCHAR(256);
+        CREATE INDEX IF NOT EXISTS idx_evidence_service_id ON transaction_evidence(service_id);
+    END IF;
+END $$;
+
+-- Add hash columns for PII-safe lookups (added in v1.1 schema)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'transaction_evidence'
+        AND column_name = 'device_id_hash'
+    ) THEN
+        ALTER TABLE transaction_evidence ADD COLUMN device_id_hash VARCHAR(64);
+        ALTER TABLE transaction_evidence ADD COLUMN ip_address_hash VARCHAR(64);
+        ALTER TABLE transaction_evidence ADD COLUMN device_fingerprint_hash VARCHAR(64);
+        CREATE INDEX IF NOT EXISTS idx_evidence_device_hash ON transaction_evidence(device_id_hash);
+        CREATE INDEX IF NOT EXISTS idx_evidence_ip_hash ON transaction_evidence(ip_address_hash);
+    END IF;
+END $$;
+
 -- ============================================================================
 -- GRANT PERMISSIONS
 -- ============================================================================

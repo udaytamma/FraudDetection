@@ -283,7 +283,7 @@ Else → ALLOW
 | Redis Cluster | Multiple nodes down | Safe mode activation |
 | ML Service | Timeout/crash | Rule-based scoring |
 | Policy Engine | Config error | Hardcoded safe mode rules |
-| Evidence Vault | Write failure | Queue locally, retry |
+| Evidence Vault | Write failure | Best-effort, log failure (no retry) |
 | Idempotency (Redis) | Redis unavailable | PostgreSQL fallback |
 | Background Tasks | Task failure | Fire-and-forget (no retry) |
 
@@ -322,10 +322,10 @@ Else → ALLOW
 ### Safe Mode Behavior
 
 When `SAFE_MODE_ENABLED=true`:
-- All scoring bypassed
+- All scoring, velocity updates, and feature computation bypassed
 - Returns configured `SAFE_MODE_DECISION` (default: ALLOW)
-- Evidence still captured
-- Metrics still recorded
+- Evidence captured with zeroed scores for auditability
+- Prometheus decision metrics and latency are recorded
 
 **Use cases:**
 - False positive spikes causing revenue loss

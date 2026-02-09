@@ -24,7 +24,7 @@ The MVP implementation uses a **rule-based detection engine** with hooks for ML 
 | **Policy Engine** | Complete | YAML configuration with hot-reload |
 | **Evidence Vault** | Complete | Immutable storage with feature snapshots |
 | **Metrics Pipeline** | Complete | Prometheus metrics for all components |
-| **Load Testing** | Complete | Validated 1000+ RPS at 106ms P99 |
+| **Load Testing** | Complete | Measured 260 RPS at 106ms P99 (single worker; projected to 1000+ with horizontal scaling) |
 
 #### Detection Logic (Current)
 

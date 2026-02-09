@@ -5,6 +5,7 @@ Provides shared fixtures for telco fraud detection tests.
 """
 
 import asyncio
+import os
 from datetime import datetime, UTC
 from typing import AsyncGenerator
 from uuid import uuid4
@@ -12,6 +13,8 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 import redis.asyncio as redis
+import asyncpg
+import httpx
 from httpx import AsyncClient, ASGITransport
 
 from src.api.main import app
@@ -24,6 +27,13 @@ from src.schemas import (
     ServiceType,
     EventSubtype,
 )
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "sanity: sanity test suite")
+    config.addinivalue_line("markers", "unit: unit tests (no infrastructure)")
+    config.addinivalue_line("markers", "integration: integration tests (requires Docker)")
+    config.addinivalue_line("markers", "system: system tests (requires running services)")
 
 
 @pytest.fixture(scope="session")
@@ -159,6 +169,121 @@ def high_risk_event(sample_event: PaymentEvent) -> PaymentEvent:
     event.geo.is_tor = True
     event.account_age_days = 1  # New subscriber
     return event
+
+
+@pytest.fixture(scope="session")
+def sanity_api_url() -> str:
+    return os.environ.get("SANITY_API_URL", "http://localhost:8000")
+
+
+@pytest.fixture(scope="session")
+def sanity_api_token() -> str | None:
+    return os.environ.get("SANITY_API_TOKEN") or None
+
+
+@pytest.fixture(scope="session")
+def sanity_dashboard_url() -> str:
+    return os.environ.get("SANITY_DASHBOARD_URL", "http://localhost:8501")
+
+
+@pytest.fixture(scope="session")
+def sanity_headers(sanity_api_token: str | None) -> dict:
+    return {"X-API-Key": sanity_api_token} if sanity_api_token else {}
+
+
+@pytest_asyncio.fixture(scope="session")
+async def system_client(sanity_api_url: str) -> AsyncGenerator[httpx.AsyncClient, None]:
+    async with httpx.AsyncClient(base_url=sanity_api_url, timeout=5.0) as client:
+        yield client
+
+
+@pytest_asyncio.fixture(scope="session")
+async def check_api_available(system_client: httpx.AsyncClient, sanity_headers: dict, sanity_api_url: str):
+    try:
+        resp = await system_client.get("/health", headers=sanity_headers)
+        if resp.status_code != 200:
+            pytest.skip(f"API not available at {sanity_api_url}")
+    except httpx.RequestError:
+        pytest.skip(f"API not available at {sanity_api_url}")
+
+
+@pytest.fixture
+def clean_transaction_payload() -> dict:
+    unique = uuid4().hex[:12]
+    return {
+        "transaction_id": f"txn_{unique}",
+        "idempotency_key": f"idem_{unique}",
+        "amount_cents": 2500,
+        "currency": "USD",
+        "card_token": f"card_{unique}",
+        "card_bin": "411111",
+        "card_last_four": "4242",
+        "service_id": "mobile_topup_001",
+        "service_name": "Mobile Topup",
+        "service_type": "mobile",
+        "event_subtype": "topup",
+        "user_id": f"user_{unique}",
+        "account_age_days": 30,
+        "is_guest": False,
+    }
+
+
+@pytest.fixture
+def high_risk_transaction_payload() -> dict:
+    unique = uuid4().hex[:12]
+    return {
+        "transaction_id": f"txn_{unique}",
+        "idempotency_key": f"idem_{unique}",
+        "amount_cents": 120000,
+        "currency": "USD",
+        "card_token": f"card_{unique}",
+        "card_bin": "411111",
+        "card_last_four": "9999",
+        "service_id": "device_upgrade_001",
+        "service_name": "Device Upgrade",
+        "service_type": "mobile",
+        "event_subtype": "device_upgrade",
+        "user_id": f"user_{unique}",
+        "account_age_days": 1,
+        "is_guest": False,
+        "device": {
+            "device_id": f"dev_{unique}",
+            "device_type": "mobile",
+            "os": "Android",
+            "os_version": "14",
+            "browser": "Chrome",
+            "browser_version": "120",
+            "is_emulator": True,
+            "is_rooted": False,
+        },
+        "geo": {
+            "ip_address": "203.0.113.10",
+            "country_code": "US",
+            "region": "CA",
+            "city": "San Francisco",
+            "latitude": 37.7749,
+            "longitude": -122.4194,
+            "is_vpn": False,
+            "is_proxy": False,
+            "is_datacenter": False,
+            "is_tor": True,
+        },
+    }
+
+
+@pytest_asyncio.fixture
+async def pg_connection() -> AsyncGenerator[asyncpg.Connection, None]:
+    postgres_url = os.environ.get("POSTGRES_URL") or settings.postgres_sync_url
+    if postgres_url.startswith("postgresql+asyncpg://"):
+        postgres_url = postgres_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    try:
+        conn = await asyncpg.connect(postgres_url)
+        yield conn
+    except Exception:
+        pytest.skip("PostgreSQL not available")
+    finally:
+        if "conn" in locals():
+            await conn.close()
 
 
 @pytest.fixture

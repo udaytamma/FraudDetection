@@ -115,7 +115,7 @@ Real-time decisioning foundation with rule-based detection.
 - YAML policy engine with hot-reload
 - Immutable evidence vault
 - Prometheus/Grafana monitoring
-- 45+ unit tests, load tested to 1000+ RPS
+- 45+ unit tests, measured 260 RPS at 106ms P99 (single worker; projected to 1000+ with horizontal scaling)
 
 **Current Status:** MVP complete, ready for shadow deployment
 

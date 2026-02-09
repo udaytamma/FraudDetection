@@ -616,6 +616,34 @@ class FeatureStore:
         await pipe.execute()
 
     # =========================================================================
+    # Chargeback Profile Updates
+    # =========================================================================
+
+    async def update_chargeback_profiles(
+        self,
+        card_token: Optional[str] = None,
+        user_id: Optional[str] = None,
+        device_id_hash: Optional[str] = None,
+        ip_address_hash: Optional[str] = None,
+    ) -> None:
+        """
+        Increment chargeback counters on entity profiles.
+
+        Called when a chargeback notification is ingested. Only card and user
+        profiles are updated because the evidence vault stores hashed device/IP
+        identifiers that cannot be mapped back to the raw keys used in Redis.
+        """
+        pipe = self.redis.pipeline()
+        if card_token:
+            key = f"{self.prefix}profile:card:{card_token}"
+            pipe.hincrby(key, "chargeback_count", 1)
+        if user_id:
+            key = f"{self.prefix}profile:user:{user_id}"
+            pipe.hincrby(key, "chargeback_count", 1)
+            pipe.hincrby(key, "chargeback_count_90d", 1)
+        await pipe.execute()
+
+    # =========================================================================
     # Full Feature Computation
     # =========================================================================
 

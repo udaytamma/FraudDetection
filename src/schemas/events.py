@@ -496,3 +496,44 @@ class PaymentEvent(BaseModel):
     def is_broadband(self) -> bool:
         """Check if this is a broadband service event."""
         return self.service_type == ServiceType.BROADBAND
+
+
+class ChargebackRequest(BaseModel):
+    """
+    Chargeback ingestion request.
+
+    Used to record chargebacks against transactions and update entity
+    risk profiles for future fraud scoring.
+    """
+    transaction_id: str = Field(
+        ...,
+        description="Original transaction ID the chargeback is against",
+        min_length=1,
+        max_length=64,
+    )
+    chargeback_id: str = Field(
+        ...,
+        description="Unique chargeback identifier from the network",
+        min_length=1,
+        max_length=64,
+    )
+    amount_cents: int = Field(
+        ...,
+        description="Chargeback amount in cents (may differ from original)",
+        ge=0,
+    )
+    reason_code: str = Field(
+        ...,
+        description="Network reason code (e.g., Visa 10.4, MC 4837)",
+        min_length=1,
+        max_length=20,
+    )
+    reason_description: Optional[str] = Field(
+        default=None,
+        description="Human-readable reason description",
+        max_length=256,
+    )
+    fraud_type: Optional[str] = Field(
+        default=None,
+        description="Fraud classification: CRIMINAL, FRIENDLY, MERCHANT_ERROR, UNKNOWN",
+    )

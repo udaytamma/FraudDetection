@@ -20,7 +20,7 @@ from src.schemas import (
     EventSubtype,
 )
 from src.scoring.risk_scorer import RiskScorer, HighValueTransactionScorer
-from src.scoring.friendly_fraud import FriendlyFraudScorer
+from src.scoring.friendly_fraud import FriendlyFraudScorer, SubscriptionAbuseScorer
 
 
 class TestRiskScorer:
@@ -594,3 +594,184 @@ class TestFriendlyFraudScorer:
         result = await scorer.score(sample_event, features)
 
         assert result.score <= 1.0
+
+
+class TestSubscriptionAbuseScorer:
+    """Tests for subscription abuse scoring."""
+
+    @pytest_asyncio.fixture
+    def scorer(self):
+        return SubscriptionAbuseScorer()
+
+    @pytest.mark.asyncio
+    async def test_non_recurring_no_score(self, scorer, sample_event):
+        """Non-recurring transactions should not trigger subscription abuse."""
+        sample_event.is_recurring = False
+        features = FeatureSet(
+            velocity=VelocityFeatures(user_transactions_24h=5),
+            entity=EntityFeatures(
+                user_is_new=True,
+                card_is_new=True,
+                ip_is_vpn=True,
+            ),
+            amount_cents=2500,
+        )
+
+        result = await scorer.score(sample_event, features)
+
+        assert result.score == 0.0
+        assert not result.triggered
+        assert len(result.reasons) == 0
+
+    @pytest.mark.asyncio
+    async def test_recurring_new_user_new_card_triggers(self, scorer, sample_event):
+        """Recurring transaction from new user + new card should trigger."""
+        sample_event.is_recurring = True
+        features = FeatureSet(
+            velocity=VelocityFeatures(user_transactions_24h=1),
+            entity=EntityFeatures(
+                user_is_new=True,
+                card_is_new=True,
+                ip_is_vpn=False,
+                ip_is_proxy=False,
+            ),
+            amount_cents=2500,
+        )
+
+        result = await scorer.score(sample_event, features)
+
+        assert result.score > 0
+        assert any("SUBSCRIPTION_NEW_USER" in r.code for r in result.reasons)
+
+    @pytest.mark.asyncio
+    async def test_recurring_high_velocity_triggers(self, scorer, sample_event):
+        """Recurring transaction with high user velocity should trigger."""
+        sample_event.is_recurring = True
+        features = FeatureSet(
+            velocity=VelocityFeatures(user_transactions_24h=5),
+            entity=EntityFeatures(
+                user_is_new=False,
+                card_is_new=False,
+                ip_is_vpn=False,
+                ip_is_proxy=False,
+            ),
+            amount_cents=2500,
+        )
+
+        result = await scorer.score(sample_event, features)
+
+        assert result.score > 0
+        assert any("SUBSCRIPTION_HIGH_VELOCITY" in r.code for r in result.reasons)
+
+    @pytest.mark.asyncio
+    async def test_recurring_vpn_triggers(self, scorer, sample_event):
+        """Recurring transaction from VPN should trigger."""
+        sample_event.is_recurring = True
+        features = FeatureSet(
+            velocity=VelocityFeatures(user_transactions_24h=1),
+            entity=EntityFeatures(
+                user_is_new=False,
+                card_is_new=False,
+                ip_is_vpn=True,
+                ip_is_proxy=False,
+            ),
+            amount_cents=2500,
+        )
+
+        result = await scorer.score(sample_event, features)
+
+        assert result.score > 0
+        assert any("SUBSCRIPTION_ANON_NETWORK" in r.code for r in result.reasons)
+
+    @pytest.mark.asyncio
+    async def test_recurring_proxy_triggers(self, scorer, sample_event):
+        """Recurring transaction from proxy should trigger."""
+        sample_event.is_recurring = True
+        features = FeatureSet(
+            velocity=VelocityFeatures(user_transactions_24h=1),
+            entity=EntityFeatures(
+                user_is_new=False,
+                card_is_new=False,
+                ip_is_vpn=False,
+                ip_is_proxy=True,
+            ),
+            amount_cents=2500,
+        )
+
+        result = await scorer.score(sample_event, features)
+
+        assert result.score > 0
+        assert any("SUBSCRIPTION_ANON_NETWORK" in r.code for r in result.reasons)
+
+    @pytest.mark.asyncio
+    async def test_multiple_signals_compound(self, scorer, sample_event):
+        """Multiple subscription abuse signals should compound."""
+        sample_event.is_recurring = True
+        features = FeatureSet(
+            velocity=VelocityFeatures(user_transactions_24h=5),
+            entity=EntityFeatures(
+                user_is_new=True,
+                card_is_new=True,
+                ip_is_vpn=True,
+                ip_is_proxy=False,
+            ),
+            amount_cents=2500,
+        )
+
+        result = await scorer.score(sample_event, features)
+
+        assert result.score > 0.4
+        assert result.triggered
+        assert len(result.reasons) >= 2
+
+    @pytest.mark.asyncio
+    async def test_clean_recurring_no_score(self, scorer, sample_event):
+        """Clean recurring transaction should not trigger."""
+        sample_event.is_recurring = True
+        features = FeatureSet(
+            velocity=VelocityFeatures(user_transactions_24h=1),
+            entity=EntityFeatures(
+                user_is_new=False,
+                card_is_new=False,
+                ip_is_vpn=False,
+                ip_is_proxy=False,
+            ),
+            amount_cents=2500,
+        )
+
+        result = await scorer.score(sample_event, features)
+
+        assert result.score == 0.0
+        assert not result.triggered
+
+
+class TestSubscriptionAbuseIntegration:
+    """Tests to verify SubscriptionAbuseScorer is integrated into RiskScorer."""
+
+    @pytest_asyncio.fixture
+    def scorer(self):
+        return RiskScorer()
+
+    @pytest.mark.asyncio
+    async def test_subscription_abuse_propagates_to_friendly_fraud(self, scorer, sample_event):
+        """Subscription abuse signals should propagate to friendly fraud score."""
+        sample_event.is_recurring = True
+        features = FeatureSet(
+            velocity=VelocityFeatures(user_transactions_24h=5),
+            entity=EntityFeatures(
+                user_is_new=True,
+                card_is_new=True,
+                ip_is_vpn=True,
+                card_total_transactions=0,
+                user_total_transactions=0,
+                device_total_transactions=0,
+            ),
+            amount_cents=2500,
+        )
+
+        scores, reasons = await scorer.compute_scores(sample_event, features)
+
+        # Subscription abuse should increase friendly fraud score
+        assert scores.friendly_fraud_score > 0
+        # Should have subscription-related reason codes
+        assert any("SUBSCRIPTION" in r.code for r in reasons)

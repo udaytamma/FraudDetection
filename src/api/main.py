@@ -26,7 +26,7 @@ from fastapi.responses import JSONResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from ..config import settings
-from ..schemas import PaymentEvent, FraudDecisionResponse, Decision, RiskScores
+from ..schemas import PaymentEvent, FraudDecisionResponse, Decision, RiskScores, FeatureSet, ChargebackRequest
 from ..features import FeatureStore
 from ..scoring import RiskScorer
 from ..policy import (
@@ -220,8 +220,24 @@ async def make_decision(
 
         # Safe mode: bypass decisioning for controlled fallback
         if settings.safe_mode_enabled:
-            response = _safe_mode_response(event)
-            telemetry.record(response.decision.value, response.processing_time_ms)
+            safe_time = (time.perf_counter() - start_time) * 1000
+            response = _safe_mode_response(event, safe_time)
+
+            # Record Prometheus metrics for SLO monitoring
+            metrics.decisions_total.labels(decision=response.decision.value).inc()
+            metrics.e2e_latency.observe(safe_time)
+            telemetry.record(response.decision.value, safe_time)
+
+            # Capture evidence for auditability (zeroed scores, no computed features)
+            safe_features = FeatureSet()
+            _fire_and_forget(
+                evidence_service.capture_evidence(
+                    event, safe_features, response.scores, response,
+                    policy_version_id=None,
+                ),
+                "safe_mode_evidence",
+            )
+
             return response
 
         # =======================================================================
@@ -414,7 +430,7 @@ def _get_review_notes(reasons: list) -> str:
     return "; ".join(r.description for r in reasons[:3])
 
 
-def _safe_mode_response(event: PaymentEvent) -> FraudDecisionResponse:
+def _safe_mode_response(event: PaymentEvent, elapsed_ms: float = 0.0) -> FraudDecisionResponse:
     """Return a deterministic response when safe mode is enabled."""
     decision = Decision[settings.safe_mode_decision]
     response = FraudDecisionResponse(
@@ -427,7 +443,7 @@ def _safe_mode_response(event: PaymentEvent) -> FraudDecisionResponse:
         friction_message=None,
         review_priority=None,
         review_notes=None,
-        processing_time_ms=0.0,
+        processing_time_ms=round(elapsed_ms, 2),
         feature_time_ms=0.0,
         scoring_time_ms=0.0,
         policy_time_ms=0.0,
@@ -753,6 +769,56 @@ async def diff_policy_versions(version1: str, version2: str):
             })
 
     return diff
+
+
+# =============================================================================
+# CHARGEBACK INGESTION ENDPOINT
+# =============================================================================
+
+@app.post("/chargebacks")
+async def ingest_chargeback(
+    chargeback: ChargebackRequest,
+    _: None = Depends(require_api_token),
+):
+    """
+    Ingest a chargeback notification.
+
+    Records the chargeback in PostgreSQL and updates entity risk profiles
+    in Redis so that future transactions reflect chargeback history.
+    """
+    # 1. Record chargeback in Postgres
+    record_id = await evidence_service.record_chargeback(
+        transaction_id=chargeback.transaction_id,
+        chargeback_id=chargeback.chargeback_id,
+        amount_cents=chargeback.amount_cents,
+        reason_code=chargeback.reason_code,
+        reason_description=chargeback.reason_description,
+        fraud_type=chargeback.fraud_type,
+    )
+
+    if not record_id:
+        raise HTTPException(status_code=500, detail="Failed to record chargeback")
+
+    # 2. Look up original transaction to find affected entities
+    evidence = await evidence_service.get_evidence(chargeback.transaction_id)
+
+    # 3. Update entity profiles in Redis with chargeback signal
+    if evidence:
+        _fire_and_forget(
+            feature_store.update_chargeback_profiles(
+                card_token=evidence.get("card_token"),
+                user_id=evidence.get("user_id"),
+                device_id_hash=evidence.get("device_id_hash"),
+                ip_address_hash=evidence.get("ip_address_hash"),
+            ),
+            "update_chargeback_profiles",
+        )
+
+    return {
+        "status": "success",
+        "record_id": record_id,
+        "profiles_updated": evidence is not None,
+    }
 
 
 # Entry point for running directly

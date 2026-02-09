@@ -10,7 +10,7 @@ Real-time payment fraud detection for Telco/MSP payment processing. Velocity-bas
 
 ## Overview
 
-A production-grade fraud detection platform designed for payment processing systems. Features real-time decisioning with sub-100ms latency, configurable policy engine, and evidence capture for dispute resolution.
+A production-grade fraud detection platform designed for payment processing systems. Features real-time decisioning with P99 106ms at 50 concurrent users (baseline), configurable policy engine, and evidence capture for dispute resolution.
 
 ## Features
 
@@ -22,7 +22,7 @@ A production-grade fraud detection platform designed for payment processing syst
 - **Friendly Fraud Scoring** - Profile-based friendly fraud risk scoring
 
 ### Architecture
-- **Real-Time Decisioning** - Sub-100ms response times
+- **Real-Time Decisioning** - P99 106ms at 50 concurrent users (single-worker baseline)
 - **Hot-Reload Policy Engine** - Update rules without restart
 - **Evidence Capture** - Full transaction context for disputes
 - **Prometheus Metrics** - Production-grade observability

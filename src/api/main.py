@@ -646,7 +646,12 @@ async def delete_rule(
 
 
 @app.post("/policy/lists/{list_type}")
-async def add_to_list(list_type: str, value: str, changed_by: str = "system"):
+async def add_to_list(
+    list_type: str,
+    value: str,
+    changed_by: str = "system",
+    _: None = Depends(require_admin_token),
+):
     """Add a value to a blocklist or allowlist."""
     try:
         update = ListUpdate(list_type=list_type, value=value, action="add")
@@ -667,7 +672,12 @@ async def add_to_list(list_type: str, value: str, changed_by: str = "system"):
 
 
 @app.delete("/policy/lists/{list_type}/{value}")
-async def remove_from_list(list_type: str, value: str, changed_by: str = "system"):
+async def remove_from_list(
+    list_type: str,
+    value: str,
+    changed_by: str = "system",
+    _: None = Depends(require_admin_token),
+):
     """Remove a value from a blocklist or allowlist."""
     try:
         update = ListUpdate(list_type=list_type, value=value, action="remove")
@@ -688,7 +698,11 @@ async def remove_from_list(list_type: str, value: str, changed_by: str = "system
 
 
 @app.post("/policy/rollback/{target_version}")
-async def rollback_policy(target_version: str, changed_by: str = "system"):
+async def rollback_policy(
+    target_version: str,
+    changed_by: str = "system",
+    _: None = Depends(require_admin_token),
+):
     """
     Rollback to a previous policy version.
 
@@ -712,7 +726,11 @@ async def rollback_policy(target_version: str, changed_by: str = "system"):
 
 
 @app.get("/policy/diff/{version1}/{version2}")
-async def diff_policy_versions(version1: str, version2: str):
+async def diff_policy_versions(
+    version1: str,
+    version2: str,
+    _: None = Depends(require_api_token),
+):
     """Compare two policy versions and return differences."""
     v1 = await policy_versioning.get_version(version1)
     v2 = await policy_versioning.get_version(version2)

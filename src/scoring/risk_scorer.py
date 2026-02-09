@@ -23,8 +23,8 @@ from ..detection import (
     VelocityAttackDetector,
     GeoAnomalyDetector,
     BotDetector,
+    FriendlyFraudDetector,
 )
-from .friendly_fraud import FriendlyFraudScorer, SubscriptionAbuseScorer
 
 
 class RiskScorer:
@@ -49,8 +49,7 @@ class RiskScorer:
         self.velocity = VelocityAttackDetector()
         self.geo = GeoAnomalyDetector()
         self.bot = BotDetector()
-        self.friendly_fraud = FriendlyFraudScorer()
-        self.subscription_abuse = SubscriptionAbuseScorer()
+        self.friendly_fraud = FriendlyFraudDetector()
 
         # Detection engine orchestrates the detectors
         self.detection_engine = DetectionEngine([
@@ -58,6 +57,7 @@ class RiskScorer:
             self.velocity,
             self.geo,
             self.bot,
+            self.friendly_fraud,
         ])
 
     async def compute_scores(
@@ -80,19 +80,12 @@ class RiskScorer:
             event, features
         )
 
-        # Run friendly fraud scorer
-        friendly_result = await self.friendly_fraud.score(event, features)
-        reasons.extend(friendly_result.reasons)
-
-        # Run subscription abuse scorer (form of friendly fraud)
-        subscription_result = await self.subscription_abuse.score(event, features)
-        reasons.extend(subscription_result.reasons)
-
         # Extract individual scores
         card_testing_score = detector_results.get("CardTestingDetector", type("", (), {"score": 0.0})()).score
         velocity_score = detector_results.get("VelocityAttackDetector", type("", (), {"score": 0.0})()).score
         geo_score = detector_results.get("GeoAnomalyDetector", type("", (), {"score": 0.0})()).score
         bot_score = detector_results.get("BotDetector", type("", (), {"score": 0.0})()).score
+        friendly_score = detector_results.get("FriendlyFraudDetector", type("", (), {"score": 0.0})()).score
 
         # Compute aggregate criminal score
         # Use weighted max - certain signals are more indicative
@@ -105,10 +98,6 @@ class RiskScorer:
 
         weighted_max = max(score * weight for score, weight in criminal_scores)
         criminal_score = min(1.0, weighted_max)
-
-        # Friendly fraud score combines general friendly fraud and subscription abuse
-        # (subscription abuse is a specific form of friendly fraud)
-        friendly_score = max(friendly_result.score, subscription_result.score)
 
         # Overall risk score - max of criminal and friendly
         # with adjustment for confidence

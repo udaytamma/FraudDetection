@@ -15,7 +15,7 @@
 | Redis | Single node, local Docker |
 | PostgreSQL | Single node, local Docker |
 | Test Tool | Locust |
-| Duration | 2 minutes |
+| Duration | 60 seconds |
 | Users | 50 concurrent |
 
 ### Observed Performance
@@ -28,18 +28,7 @@
 | **Error Rate** | 0.00% | <0.1% | Passing |
 | **Failures** | 0 | 0 | Passing |
 
-### Latency Breakdown
-
-```
-Total P99: 106ms
-├── Feature computation (Redis):  ~50ms (47%)
-├── Risk scoring (detection):     ~20ms (19%)
-├── Policy evaluation:            ~10ms (9%)
-├── Evidence capture (async):     ~20ms (19%)
-└── Network/serialization:        ~6ms  (6%)
-```
-
-**Key Insight:** Redis velocity lookups dominate latency at 47% of total. At scale, this is the first optimization target.
+Component-level latency breakdown is **not captured** in this baseline run; only aggregate latencies are reported in the load test results file.
 
 ### Capacity Projection
 

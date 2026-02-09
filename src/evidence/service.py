@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 
 from ..config import settings
 from ..metrics import metrics
+from pydantic.json import pydantic_encoder
 
 logger = logging.getLogger("fraud_detection.evidence")
 from ..schemas import (
@@ -382,13 +383,13 @@ class EvidenceService:
                     "model_version": scores.model_version,
                     "model_variant": scores.model_variant,
                     "decision": response.decision.value,
-                    "decision_reasons": json.dumps(decision_reasons),
-                    "features_snapshot": json.dumps(features_snapshot),
+                    "decision_reasons": self._json_dumps(decision_reasons),
+                    "features_snapshot": self._json_dumps(features_snapshot),
                     "avs_result": event.verification.avs_result if event.verification else None,
                     "cvv_result": event.verification.cvv_result if event.verification else None,
                     "three_ds_result": event.verification.three_ds_result if event.verification else None,
                     "three_ds_version": event.verification.three_ds_version if event.verification else None,
-                    "device_fingerprint": json.dumps(device_fingerprint) if device_fingerprint else None,
+                    "device_fingerprint": self._json_dumps(device_fingerprint) if device_fingerprint else None,
                     "device_fingerprint_hash": fingerprint_hash,
                     "geo_country": event.geo.country_code if event.geo else None,
                     "geo_region": event.geo.region if event.geo else None,
@@ -503,7 +504,7 @@ class EvidenceService:
                 """),
                 {
                     "idempotency_key": idempotency_key,
-                    "response_json": json.dumps(response_json),
+                    "response_json": self._json_dumps(response_json),
                     "created_at": datetime.now(UTC),
                     "expires_at": expires_at,
                 },
@@ -527,7 +528,7 @@ class EvidenceService:
             return
 
         fernet = Fernet(settings.evidence_vault_key)
-        ciphertext = fernet.encrypt(json.dumps(raw_payload).encode("utf-8")).decode("utf-8")
+        ciphertext = fernet.encrypt(self._json_dumps(raw_payload).encode("utf-8")).decode("utf-8")
         expires_at = datetime.now(UTC) + timedelta(days=settings.evidence_retention_days)
 
         await session.execute(
@@ -573,6 +574,11 @@ class EvidenceService:
         if value is None:
             return None
         return json.dumps(value, sort_keys=True)
+
+    @staticmethod
+    def _json_dumps(value: object) -> str:
+        """Safe JSON serialization for datetime and pydantic types."""
+        return json.dumps(value, default=pydantic_encoder)
 
     async def record_chargeback(
         self,

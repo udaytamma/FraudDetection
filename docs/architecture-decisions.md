@@ -93,9 +93,9 @@ Key design decisions with rationale, alternatives considered, and accepted risks
 - Risk accepted: Threshold is lower than ideal; some quality gaps may persist.
 - Docs needed: none.
 
-## 14) Dashboard Mock Data
-- From → To: Mock-only charts → live `/metrics/summary` telemetry with fallback to mock.
-- Why needed: Demonstrates real observability signals.
-- Why chosen over other options: In-memory buffer avoids extra infra.
-- Risk accepted: Telemetry resets on restart; limited history.
+## 14) Dashboard Data Source
+- From → To: Mock-only charts → live Postgres-backed dashboard with optional `/metrics/summary` telemetry endpoint for external consumers.
+- Why needed: Demonstrates real observability signals based on persisted evidence.
+- Why chosen over other options: Postgres queries avoid extra infra and match the evidence store.
+- Risk accepted: Dashboard requires database access; `/metrics/summary` exists but is not used by `dashboard.py`.
 - Docs needed: none (optional note in README).

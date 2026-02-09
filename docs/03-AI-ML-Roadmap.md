@@ -23,31 +23,29 @@ The MVP implementation uses a **rule-based detection engine** with hooks for ML 
 | **Risk Scoring** | Complete | Rule-based combination of detector signals |
 | **Policy Engine** | Complete | YAML configuration with hot-reload |
 | **Evidence Vault** | Complete | Immutable storage with feature snapshots |
-| **Metrics Pipeline** | Complete | Prometheus metrics for all components |
-| **Load Testing** | Complete | Measured 260 RPS at 106ms P99 (single worker; projected to 1000+ with horizontal scaling) |
+| **Metrics Pipeline** | Complete | Prometheus metrics for requests/latency/decisions; additional metrics defined but not yet populated |
+| **Load Testing** | Complete | Measured 260 RPS at 106ms P99 (single worker; projections are modeled, not measured) |
 
 #### Detection Logic (Current)
 
 ```python
-# Simplified scoring formula (rule-based)
-criminal_score = max(
-    card_testing.confidence * 0.9,    # Card testing patterns
-    velocity.confidence * 0.8,         # Velocity rule triggers
-    geo_anomaly.confidence * 0.7,     # Geographic issues
-    bot_detection.confidence * 0.95   # Automation signals
-)
+# Simplified scoring formula (rule-based, current MVP)
+criminal_score = min(1.0, max(
+    card_testing.score * 1.0,
+    velocity.score * 0.9,
+    geo_anomaly.score * 0.7,
+    bot_detection.score * 1.0,
+))
 
-friendly_score = friendly_fraud.confidence * 0.6
+friendly_score = max(friendly_fraud.score, subscription_abuse.score)
+risk_score = max(criminal_score, friendly_score)
 
-# Policy thresholds (configurable)
-if criminal_score >= 0.85 or friendly_score >= 0.95:
-    return BLOCK
-elif criminal_score >= 0.60 or friendly_score >= 0.70:
-    return FRICTION
-elif criminal_score >= 0.40 or friendly_score >= 0.50:
-    return REVIEW
-else:
-    return ALLOW
+# Confidence dampening for low-confidence cases
+if confidence < 0.5:
+    risk_score = 0.3 + (risk_score - 0.3) * confidence * 2
+
+# Policy thresholds are evaluated from config/policy.yaml
+decision = policy_engine.evaluate(event, features, scores)
 ```
 
 ---
@@ -196,6 +194,8 @@ Rollback Challenger if ANY true:
 ```
 
 ### Replay Framework
+
+Status: Planned; not implemented in this repo.
 
 #### Purpose
 
@@ -417,7 +417,7 @@ class EnsembleScoringService:
 
 **When asked "What's the AI/ML roadmap?":**
 
-> "The current implementation is rule-based by design - we prioritized getting to market fast with interpretable decisions. But the architecture is ML-ready: features are captured in the evidence vault, the scoring service has a clean interface for model integration, and we have the replay framework for validation.
+> "The current implementation is rule-based by design - we prioritized getting to market fast with interpretable decisions. But the architecture is ML-ready: features are captured in the evidence vault, the scoring service has a clean interface for model integration, and we plan a replay framework for validation (not implemented in the MVP).
 >
 > Phase 2 introduces a simple ML model - XGBoost for criminal fraud - using 25+ features from velocity counters and entity profiles. Labels come from chargebacks with a 120-day maturity window. We'll deploy via champion/challenger: 80% to the proven rules, 15% to the ML challenger, 5% holdout.
 >

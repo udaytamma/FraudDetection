@@ -233,9 +233,12 @@ FraudDetection/
 │   ├── config/                 # Settings management
 │   │   └── settings.py         # Pydantic settings
 │   ├── schemas/                # Data models
-│   │   ├── request.py          # API request models
-│   │   └── response.py         # API response models
+│   │   ├── decisions.py        # Decisions and responses
+│   │   ├── entities.py         # Entity profiles
+│   │   ├── events.py           # Request/event models
+│   │   └── features.py         # Feature schemas
 │   ├── features/               # Feature extraction
+│   │   ├── store.py            # Feature store orchestration
 │   │   └── velocity.py         # Velocity counter logic
 │   ├── detection/              # Fraud detectors
 │   │   ├── card_testing.py     # Card testing detection
@@ -249,7 +252,7 @@ FraudDetection/
 │   ├── policy/                 # Policy engine
 │   │   └── engine.py           # Rule evaluation
 │   ├── evidence/               # Evidence capture
-│   │   └── capture.py          # Transaction context
+│   │   └── service.py          # Evidence service
 │   └── metrics/                # Observability
 │       └── prometheus.py       # Metric definitions
 ├── config/
@@ -389,15 +392,20 @@ Service: transactions (24h)
 
 ### Risk Scoring
 
-Weighted signal aggregation:
+Risk scoring is rule-based in the MVP and uses a weighted max for criminal signals plus a friendly fraud score:
 
-| Signal | Weight |
-|--------|--------|
-| Card Testing | 40 |
-| Velocity Breach | 30 |
-| Geo Anomaly | 25 |
-| High Amount | 15 |
-| New Device | 10 |
+| Signal | Weight (weighted max) |
+|--------|------------------------|
+| Card Testing | 1.0 |
+| Velocity | 0.9 |
+| Geo Anomaly | 0.7 |
+| Bot/Emulator | 1.0 |
+
+Friendly fraud score is computed separately and combined as:
+
+- `criminal_score = min(1.0, max(weighted criminal signals))`
+- `friendly_score = max(friendly_fraud, subscription_abuse)`
+- `risk_score = max(criminal_score, friendly_score)` with confidence dampening for low-confidence cases
 
 ## Testing
 
@@ -416,16 +424,47 @@ pytest tests/test_card_testing.py -v
 
 ### Prometheus Metrics
 
-Available at `/metrics` (token required if set):
+Available at `/metrics` (token required if set).
 
+Emitted in the current MVP:
+- `fraud_requests_total` - Request counts by endpoint
 - `fraud_decisions_total` - Decision counts by outcome
-- `fraud_e2e_latency_ms` - Decision latency histogram
-- `fraud_detector_triggers_total` - Signal trigger counts
-- `fraud_policy_version` - Current policy version
+- `fraud_e2e_latency_ms` - End-to-end decision latency histogram
+- `fraud_feature_latency_ms` - Feature computation latency histogram
+- `fraud_scoring_latency_ms` - Scoring latency histogram
+- `fraud_policy_latency_ms` - Policy evaluation latency histogram
+- `fraud_slow_requests_total` - SLA breach counter
+- `fraud_errors_total` - Error counts by type
+- `fraud_cache_hits_total` - Idempotency cache hits
+
+Defined but not yet populated in this codebase:
+- `fraud_cache_misses_total`
+- `fraud_approval_rate`
+- `fraud_block_rate`
+- `fraud_risk_score`
+- `fraud_criminal_score`
+- `fraud_friendly_score`
+- `fraud_detector_triggers_total`
+- `fraud_redis_latency_ms`
+- `fraud_postgres_latency_ms`
+- `fraud_component_health`
+- `fraud_policy_version`
 
 ### Grafana Dashboard
 
 Import `grafana/fraud-overview.json` for pre-built visualizations (optional).
+
+Notes on panels that depend on metrics not populated in the current MVP (they will show empty/zero until instrumentation is added):
+- Approval Rate
+- Block Rate
+- Cache Hit/Miss Rate (misses are not emitted)
+- Component Latency (P99)
+- Criminal vs Friendly Fraud Scores (P95)
+- Detector Fire Rates (rate/5m)
+- Policy Engine Health
+- PostgreSQL Health
+- Redis Health
+- Risk Score Distribution
 
 ## Security Considerations
 

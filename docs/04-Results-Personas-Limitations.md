@@ -51,22 +51,9 @@ Total P99: 106ms
 | 8x (400 users) | 1,500 | 200ms | Redis throughput | Redis Cluster |
 | 16x+ (1000 users) | 3,000+ | >200ms | Architecture limit | Kafka + Flink |
 
-### Replay Validation
+### Replay Validation (Not Implemented in MVP)
 
-Using synthetic historical data with known fraud labels:
-
-| Scenario | Transactions | Fraud Injected | Detected | False Positives |
-|----------|--------------|----------------|----------|-----------------|
-| Normal traffic | 10,000 | 1% (100) | 72/100 | 180/9,900 |
-| Card testing attack | 1,000 | 10% (100) | 94/100 | 45/900 |
-| Velocity attack | 500 | 20% (100) | 88/100 | 22/400 |
-| Mixed realistic | 15,000 | 2% (300) | 221/300 | 195/14,700 |
-
-**Summary:**
-- Detection rate: 72-94% depending on attack type
-- False positive rate: 1.3-5% depending on scenario
-- Card testing attacks have highest detection confidence
-- Velocity attacks show strong detection with rule-based approach
+The current MVP in this repo does not include a historical replay pipeline, and no replay artifacts are checked in. This section is reserved for future results once a replay tool is implemented.
 
 ---
 
@@ -206,7 +193,7 @@ What This Doesn't Prove:
    └── Threshold performance
 
 3. Threshold Adjustment:
-   └── Run replay simulation on proposed change
+   └── Run replay simulation on proposed change (planned; not in MVP)
    └── Review projected impact
    └── If acceptable: Apply via Policy Settings
    └── Monitor for 48h post-change
@@ -252,8 +239,8 @@ What This Doesn't Prove:
    └── Scale or restart as needed
 
 3. Safe Mode Activation:
-   └── Automatic if error rate >5%
-   └── Manual if component failure detected
+   └── Manual toggle via `SAFE_MODE_ENABLED` (MVP)
+   └── Use during component failure or incident investigation
    └── Notify Fraud Ops (decisions will be conservative)
    └── Document reason and duration
 

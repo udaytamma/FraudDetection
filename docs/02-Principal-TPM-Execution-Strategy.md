@@ -73,6 +73,8 @@ For each transaction:
 - Fraud Ops can adjust within guard rails without engineering
 - Changes require replay testing before production
 
+Note: Replay tooling is not implemented in this repo; this is a planned production process.
+
 ### Trade-off 2: Detection Speed vs. Accuracy
 
 **The Core Tension:** More sophisticated detection takes more time, but payments can't wait.
@@ -163,6 +165,8 @@ Week 4-5: Gradual Ramp (25% → 50% → 100%)
 | **Block rate guard** | Rolling metric | Rises >3% vs baseline | Alert Fraud Ops, investigate |
 | **Safe mode** | Fallback logic | Any critical failure | Configurable decision via `SAFE_MODE_DECISION` |
 
+Note: Automated breakers are not implemented in the MVP; safe mode is a manual toggle via `SAFE_MODE_ENABLED`.
+
 ### Safe Mode Behavior
 
 When safe mode activates:
@@ -251,7 +255,7 @@ Severity 3 (Non-urgent):
 | Error Rate | <0.1% | Prometheus | Eng |
 | Approval Rate Delta | >-2% | A/B comparison | Product |
 | Fraud Detection Rate | >-5% | Historical replay | DS/ML |
-| Load Test | 1000+ RPS | Locust | Eng |
+| Load Test | 260 RPS baseline (single worker) | Locust | Eng |
 | Test Coverage | 70%+ | CI/CD | Eng |
 
 ### Ongoing Governance

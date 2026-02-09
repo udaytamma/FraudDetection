@@ -217,7 +217,7 @@ This is a **PCI-aware** design, not a claim of PCI DSS certification.
 | Entity | Fraud Vector | Storage | Key Fields |
 |--------|--------------|---------|------------|
 | **Card** | Stolen, enumerated, tested | Redis Hash | first_seen, chargeback_count, distinct_merchants_30d |
-| **Device** | Shared across fraud rings, emulated | Redis Hash | distinct_cards_24h (HLL), is_emulator, is_rooted |
+| **Device** | Shared across fraud rings, emulated | Redis Hash | distinct_cards_24h (ZSET distinct count), is_emulator, is_rooted |
 | **IP** | Proxied, VPN, datacenter | Redis Hash | distinct_cards_1h, is_datacenter, geo_country |
 | **User** | Fake accounts, ATO, friendly fraud | Redis Hash | account_age_days, chargeback_rate_90d, risk_tier |
 | **Service** | Telco/MSP account abuse | Redis Hash | total_transactions, first_seen, last_seen |

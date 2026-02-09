@@ -115,7 +115,7 @@ Real-time decisioning foundation with rule-based detection.
 - YAML policy engine with hot-reload
 - Immutable evidence vault
 - Prometheus/Grafana monitoring
-- 45+ unit tests, measured 260 RPS at 106ms P99 (single worker; projected to 1000+ with horizontal scaling)
+- Test suite includes 190+ pytest cases; measured 260 RPS at 106ms P99 on a single worker (higher capacity is projected, not measured)
 
 **Current Status:** MVP complete, ready for shadow deployment
 
@@ -162,6 +162,8 @@ Production hardening and expanded detection.
 | **False Positives** | 18% | 12% | 8% | Better signals |
 | **Dispute Win Rate** | 22% | 40% | 55% | Evidence capture |
 
+*Note: Approval rate, fraud rate, manual review, false positives, and dispute win rate are modeled projections, not measured in the MVP.*
+
 ### Financial Impact Model
 
 | Line Item | Annual Impact |
@@ -190,8 +192,8 @@ Production hardening and expanded detection.
 
 **Proceed with Phase 2 deployment** based on:
 
-1. Phase 1 MVP meets all technical SLAs (106ms P99 vs 200ms target)
-2. Load testing validates 1000+ RPS capacity (4x current peak)
+1. Phase 1 MVP meets latency SLA in a local baseline test (106ms P99 vs 200ms target)
+2. Load testing measured 260 RPS on a single worker; higher capacity is projected, not measured
 3. Rule-based detection provides immediate value while ML matures
 4. Evidence capture infrastructure enables dispute win rate improvement
 5. Hot-reload policy allows business-led threshold tuning

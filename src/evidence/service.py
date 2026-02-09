@@ -243,13 +243,13 @@ class EvidenceService:
                             :criminal_score,
                             :friendly_fraud_score,
                             :decision,
-                            :decision_reasons::jsonb,
-                            :features_snapshot::jsonb,
+                            CAST(:decision_reasons AS jsonb),
+                            CAST(:features_snapshot AS jsonb),
                             :avs_result,
                             :cvv_result,
                             :three_ds_result,
                             :three_ds_version,
-                            :device_fingerprint::jsonb,
+                            CAST(:device_fingerprint AS jsonb),
                             :device_fingerprint_hash,
                             :geo_country,
                             :geo_region,
@@ -271,7 +271,8 @@ class EvidenceService:
                         # Map service_id to merchant_id column (backward compatible)
                         "merchant_id": event.service_id,
                         "merchant_name": event.service_name,
-                        "merchant_mcc": str(event.event_subtype.value) if event.event_subtype else None,
+                        # MCC is a legacy card-network field; telco event_subtype values exceed 4 chars
+                        "merchant_mcc": None,
                         "card_token": event.card_token,
                         "card_bin": event.card_bin,
                         "card_last_four": event.card_last_four,
@@ -383,7 +384,7 @@ class EvidenceService:
                         expires_at
                     ) VALUES (
                         :idempotency_key,
-                        :response_json::jsonb,
+                        CAST(:response_json AS jsonb),
                         :created_at,
                         :expires_at
                     )

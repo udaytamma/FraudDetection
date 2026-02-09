@@ -1,5 +1,5 @@
 # Data schemas for Fraud Detection Platform
-from .events import PaymentEvent, EventType, DeviceInfo, GeoInfo, VerificationInfo, ServiceType, EventSubtype, ChargebackRequest
+from .events import PaymentEvent, EventType, DeviceInfo, GeoInfo, VerificationInfo, ServiceType, EventSubtype, ChargebackRequest, RefundRequest
 from .entities import (
     CardProfile,
     DeviceProfile,
@@ -28,6 +28,7 @@ __all__ = [
     "ServiceType",
     "EventSubtype",
     "ChargebackRequest",
+    "RefundRequest",
     # Entities
     "CardProfile",
     "DeviceProfile",

@@ -141,7 +141,7 @@ class FeatureStore:
             self.velocity.count("card", card_token, "attempts", self.WINDOW_24H),
             self.velocity.count("card", card_token, "declines", self.WINDOW_10M),
             self.velocity.count("card", card_token, "declines", self.WINDOW_1H),
-            self.velocity.count_distinct("card", card_token, "merchants", self.WINDOW_24H),
+            self.velocity.count_distinct("card", card_token, "accounts", self.WINDOW_24H),
             self.velocity.count_distinct("card", card_token, "devices", self.WINDOW_24H),
             self.velocity.count_distinct("card", card_token, "ips", self.WINDOW_24H),
         )
@@ -152,7 +152,7 @@ class FeatureStore:
             "card_attempts_24h": results[2],
             "card_declines_10m": results[3],
             "card_declines_1h": results[4],
-            "card_distinct_merchants_24h": results[5],
+            "card_distinct_accounts_24h": results[5],
             "card_distinct_devices_24h": results[6],
             "card_distinct_ips_24h": results[7],
         }
@@ -641,6 +641,28 @@ class FeatureStore:
             key = f"{self.prefix}profile:user:{user_id}"
             pipe.hincrby(key, "chargeback_count", 1)
             pipe.hincrby(key, "chargeback_count_90d", 1)
+        await pipe.execute()
+
+    # =========================================================================
+    # Refund Profile Updates
+    # =========================================================================
+
+    async def update_refund_profiles(
+        self,
+        user_id: Optional[str] = None,
+    ) -> None:
+        """
+        Increment refund counters on entity profiles.
+
+        Called when a refund notification is ingested. Only user
+        profiles are updated because refunds are tied to account-level
+        behavior for friendly fraud detection in this MVP.
+        """
+        if not user_id:
+            return
+        pipe = self.redis.pipeline()
+        key = f"{self.prefix}profile:user:{user_id}"
+        pipe.hincrby(key, "refund_count_90d", 1)
         await pipe.execute()
 
     # =========================================================================

@@ -179,24 +179,46 @@ Content-Type: application/json
 
 {
   "transaction_id": "txn_123",
-  "amount": 99.99,
+  "idempotency_key": "idem_456",
+  "amount_cents": 9900,
   "currency": "USD",
-  "card_hash": "abc123...",
-  "merchant_id": "merch_456",
-  "device_fingerprint": "fp_789",
-  "ip_address": "192.168.1.1",
-  "timestamp": "2026-01-12T19:00:00Z"
+  "card_token": "card_abc123",
+  "service_id": "mobile_prepaid_001",
+  "service_name": "Telco Mobile Prepaid",
+  "service_type": "mobile",
+  "event_subtype": "sim_activation",
+  "user_id": "user_789",
+  "device": {
+    "device_id": "dev_456",
+    "device_type": "mobile",
+    "os": "iOS",
+    "os_version": "17.0"
+  },
+  "geo": {
+    "ip_address": "192.168.1.1",
+    "country_code": "US",
+    "region": "CA",
+    "city": "San Francisco"
+  }
 }
 ```
 
 **Response:**
 ```json
 {
-  "decision": "APPROVE",
-  "risk_score": 23,
-  "signals": [],
-  "evidence_id": "ev_abc123",
-  "latency_ms": 45
+  "transaction_id": "txn_123",
+  "idempotency_key": "idem_456",
+  "decision": "ALLOW",
+  "scores": {
+    "risk_score": 0.12,
+    "criminal_score": 0.05,
+    "friendly_fraud_score": 0.02,
+    "confidence": 0.68
+  },
+  "reasons": [],
+  "processing_time_ms": 45.2,
+  "policy_version": "1.0.0",
+  "is_cached": false
 }
 ```
 
@@ -381,7 +403,7 @@ Redis ZSET sliding-window counters tracked per entity:
 
 ```
 Card:    attempts (10m/1h/24h), declines (10m/1h),
-         distinct merchants/devices/IPs (24h)
+         distinct accounts/devices/IPs (24h)
 Device:  attempts (1h/24h), distinct cards (1h/24h),
          distinct users (24h)
 IP:      attempts (1h/24h), distinct cards (1h/24h)
@@ -436,6 +458,7 @@ Emitted in the current MVP:
 - `fraud_slow_requests_total` - SLA breach counter
 - `fraud_errors_total` - Error counts by type
 - `fraud_cache_hits_total` - Idempotency cache hits
+- `fraud_postgres_latency_ms` - Postgres operation latency (evidence + idempotency)
 
 Defined but not yet populated in this codebase:
 - `fraud_cache_misses_total`
@@ -446,7 +469,6 @@ Defined but not yet populated in this codebase:
 - `fraud_friendly_score`
 - `fraud_detector_triggers_total`
 - `fraud_redis_latency_ms`
-- `fraud_postgres_latency_ms`
 - `fraud_component_health`
 - `fraud_policy_version`
 

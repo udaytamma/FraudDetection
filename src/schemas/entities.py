@@ -84,9 +84,9 @@ class CardProfile(BaseModel):
     )
 
     # Distinct entity counts
-    distinct_merchants_24h: int = Field(
+    distinct_accounts_24h: int = Field(
         default=0,
-        description="Distinct merchants in last 24 hours",
+        description="Distinct accounts/services in last 24 hours",
     )
     distinct_devices_24h: int = Field(
         default=0,

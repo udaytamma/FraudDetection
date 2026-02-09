@@ -537,3 +537,40 @@ class ChargebackRequest(BaseModel):
         default=None,
         description="Fraud classification: CRIMINAL, FRIENDLY, MERCHANT_ERROR, UNKNOWN",
     )
+
+
+class RefundRequest(BaseModel):
+    """
+    Refund ingestion request.
+
+    Used to record refunds against transactions and update user
+    profiles for friendly fraud detection.
+    """
+    transaction_id: str = Field(
+        ...,
+        description="Original transaction ID the refund is against",
+        min_length=1,
+        max_length=64,
+    )
+    refund_id: str = Field(
+        ...,
+        description="Unique refund identifier from the processor",
+        min_length=1,
+        max_length=64,
+    )
+    amount_cents: int = Field(
+        ...,
+        description="Refund amount in cents (may differ from original)",
+        ge=0,
+    )
+    reason_code: Optional[str] = Field(
+        default=None,
+        description="Processor reason code (if provided)",
+        min_length=1,
+        max_length=20,
+    )
+    reason_description: Optional[str] = Field(
+        default=None,
+        description="Human-readable refund reason",
+        max_length=256,
+    )

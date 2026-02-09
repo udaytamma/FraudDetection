@@ -26,7 +26,7 @@ from fastapi.responses import JSONResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from ..config import settings
-from ..schemas import PaymentEvent, FraudDecisionResponse, Decision, RiskScores, FeatureSet, ChargebackRequest
+from ..schemas import PaymentEvent, FraudDecisionResponse, Decision, RiskScores, FeatureSet, ChargebackRequest, RefundRequest
 from ..features import FeatureStore
 from ..scoring import RiskScorer
 from ..policy import (

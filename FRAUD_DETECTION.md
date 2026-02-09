@@ -216,7 +216,7 @@ This is a **PCI-aware** design, not a claim of PCI DSS certification.
 
 | Entity | Fraud Vector | Storage | Key Fields |
 |--------|--------------|---------|------------|
-| **Card** | Stolen, enumerated, tested | Redis Hash | first_seen, chargeback_count, distinct_merchants_30d |
+| **Card** | Stolen, enumerated, tested | Redis Hash | first_seen, chargeback_count, distinct_accounts_24h |
 | **Device** | Shared across fraud rings, emulated | Redis Hash | distinct_cards_24h (ZSET distinct count), is_emulator, is_rooted |
 | **IP** | Proxied, VPN, datacenter | Redis Hash | distinct_cards_1h, is_datacenter, geo_country |
 | **User** | Fake accounts, ATO, friendly fraud | Redis Hash | account_age_days, chargeback_rate_90d, risk_tier |
@@ -243,6 +243,8 @@ This is a **PCI-aware** design, not a claim of PCI DSS certification.
 | Aggregates (near real-time) | Incremental updates | Redis Hash | user_chargeback_count |
 | Historical (batch) | Daily rollups | Feast (future phase; Redis-only in MVP) | user_chargeback_rate_90d |
 
+Refund aggregates are tracked on the user profile (`refund_count_90d`) when refund ingestion is wired into the pipeline.
+
 ---
 
 ## Decision Logic
@@ -264,7 +266,7 @@ This is a **PCI-aware** design, not a claim of PCI DSS certification.
 | REVIEW | Hold for analyst | Delay, human cost, higher accuracy |
 | BLOCK | Decline | Zero fraud risk, lost revenue if legitimate |
 
-### Profit-Based Thresholds
+### Profit-Based Thresholds (Design Reference)
 
 ```
 Expected Loss = P(fraud) × (amount + chargeback_fee + penalty + ops_cost)
@@ -273,6 +275,9 @@ Expected Gain = P(legitimate) × (revenue from transaction)
 If Expected Loss > Expected Gain × risk_tolerance → BLOCK or FRICTION
 Else → ALLOW
 ```
+
+This is documented as a design target for economic decisioning.
+The current MVP policy engine applies score thresholds only.
 
 ---
 

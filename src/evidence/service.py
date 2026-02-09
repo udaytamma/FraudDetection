@@ -13,6 +13,7 @@ import json
 import logging
 import hmac
 import hashlib
+import time
 from datetime import datetime, UTC, timedelta
 from typing import Optional
 from uuid import uuid4
@@ -122,6 +123,7 @@ class EvidenceService:
         try:
             evidence_id = str(uuid4())
             vault_id = str(uuid4())
+            started_at = time.perf_counter()
 
             # Build features snapshot
             features_snapshot = {
@@ -304,6 +306,7 @@ class EvidenceService:
 
                 await self._insert_vault_record(session, vault_id, evidence_id, raw_payload)
                 await session.commit()
+                metrics.postgres_latency.observe((time.perf_counter() - started_at) * 1000)
 
             return evidence_id
 
@@ -329,6 +332,7 @@ class EvidenceService:
             return None
 
         async with self.session_factory() as session:
+            started_at = time.perf_counter()
             result = await session.execute(
                 text("""
                     SELECT *
@@ -337,6 +341,7 @@ class EvidenceService:
                 """),
                 {"transaction_id": transaction_id},
             )
+            metrics.postgres_latency.observe((time.perf_counter() - started_at) * 1000)
             row = result.mappings().first()
             return dict(row) if row else None
 
@@ -346,6 +351,7 @@ class EvidenceService:
             return None
 
         async with self.session_factory() as session:
+            started_at = time.perf_counter()
             result = await session.execute(
                 text("""
                     SELECT response_json
@@ -355,6 +361,7 @@ class EvidenceService:
                 """),
                 {"idempotency_key": idempotency_key},
             )
+            metrics.postgres_latency.observe((time.perf_counter() - started_at) * 1000)
             row = result.mappings().first()
             if not row:
                 return None
@@ -375,6 +382,7 @@ class EvidenceService:
 
         expires_at = datetime.now(UTC) + timedelta(hours=ttl_hours) if ttl_hours else None
         async with self.session_factory() as session:
+            started_at = time.perf_counter()
             await session.execute(
                 text("""
                     INSERT INTO idempotency_records (
@@ -398,6 +406,7 @@ class EvidenceService:
                 },
             )
             await session.commit()
+            metrics.postgres_latency.observe((time.perf_counter() - started_at) * 1000)
 
     async def _insert_vault_record(
         self,
@@ -497,6 +506,7 @@ class EvidenceService:
             record_id = str(uuid4())
 
             async with self.session_factory() as session:
+                started_at = time.perf_counter()
                 await session.execute(
                     text("""
                         INSERT INTO chargebacks (
@@ -537,9 +547,90 @@ class EvidenceService:
                     },
                 )
                 await session.commit()
+                metrics.postgres_latency.observe((time.perf_counter() - started_at) * 1000)
 
             return record_id
 
         except Exception as e:
             logger.warning("Chargeback recording failed: %s", e)
+            metrics.errors_total.labels(error_type="ChargebackRecordFailed").inc()
+            return None
+
+    async def record_refund(
+        self,
+        transaction_id: str,
+        refund_id: str,
+        amount_cents: int,
+        reason_code: Optional[str] = None,
+        reason_description: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Record a refund against a transaction.
+
+        Used for:
+        - Friendly fraud labeling
+        - Updating user refund history
+
+        Args:
+            transaction_id: Original transaction ID
+            refund_id: Refund identifier
+            amount_cents: Refund amount
+            reason_code: Processor reason code
+            reason_description: Human-readable reason
+
+        Returns:
+            Refund record ID if successful
+        """
+        if not self.session_factory:
+            return None
+
+        try:
+            record_id = str(uuid4())
+
+            async with self.session_factory() as session:
+                started_at = time.perf_counter()
+                await session.execute(
+                    text("""
+                        INSERT INTO refunds (
+                            id,
+                            transaction_id,
+                            refund_id,
+                            processed_at,
+                            amount_cents,
+                            currency,
+                            reason_code,
+                            reason_description,
+                            status
+                        ) VALUES (
+                            :id,
+                            :transaction_id,
+                            :refund_id,
+                            :processed_at,
+                            :amount_cents,
+                            :currency,
+                            :reason_code,
+                            :reason_description,
+                            :status
+                        )
+                    """),
+                    {
+                        "id": record_id,
+                        "transaction_id": transaction_id,
+                        "refund_id": refund_id,
+                        "processed_at": datetime.now(UTC),
+                        "amount_cents": amount_cents,
+                        "currency": "USD",
+                        "reason_code": reason_code,
+                        "reason_description": reason_description,
+                        "status": "RECEIVED",
+                    },
+                )
+                await session.commit()
+                metrics.postgres_latency.observe((time.perf_counter() - started_at) * 1000)
+
+            return record_id
+
+        except Exception as e:
+            logger.warning("Refund recording failed: %s", e)
+            metrics.errors_total.labels(error_type="RefundRecordFailed").inc()
             return None

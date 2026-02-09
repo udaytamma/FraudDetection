@@ -167,6 +167,39 @@ CREATE INDEX IF NOT EXISTS idx_chargebacks_fraud_type ON chargebacks(fraud_type)
 CREATE INDEX IF NOT EXISTS idx_chargebacks_status ON chargebacks(status);
 
 -- ============================================================================
+-- REFUNDS TABLE
+-- Links refunds to original transactions for friendly-fraud labeling
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS refunds (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+    -- Link to original transaction
+    transaction_id VARCHAR(64) NOT NULL REFERENCES transaction_evidence(transaction_id),
+
+    -- Refund details
+    refund_id VARCHAR(64) NOT NULL UNIQUE,
+    processed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+
+    -- Amount (may differ from original)
+    amount_cents BIGINT NOT NULL,
+    currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+
+    -- Reason codes (processor-specific)
+    reason_code VARCHAR(20),
+    reason_description VARCHAR(256),
+
+    -- Status tracking
+    status VARCHAR(20) NOT NULL DEFAULT 'RECEIVED',
+
+    CONSTRAINT valid_refund_status CHECK (
+        status IN ('RECEIVED', 'PROCESSED', 'FAILED')
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_refunds_transaction_id ON refunds(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_refunds_processed_at ON refunds(processed_at);
+
+-- ============================================================================
 -- POLICY VERSIONS TABLE
 -- Immutable version history for policy settings with semantic versioning
 -- Every change creates a new version; rollback creates new version from old content

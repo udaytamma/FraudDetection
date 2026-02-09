@@ -57,6 +57,8 @@ For each transaction:
     → Allow
 ```
 
+This framework is the economic target state; the MVP currently applies score thresholds and rule overrides.
+
 **Operationalized as:**
 
 | Scenario | Risk Score | Amount | Customer Profile | Decision |

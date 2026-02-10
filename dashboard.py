@@ -384,6 +384,65 @@ def submit_transaction(payload: dict) -> dict:
         return {"error": str(e)}
 
 
+def get_model_registry() -> dict:
+    """Read model registry JSON for dashboard display."""
+    registry_path = os.path.join(os.path.dirname(__file__), "models", "registry.json")
+    try:
+        with open(registry_path, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+async def get_ml_analytics() -> dict:
+    """Get ML-specific analytics from PostgreSQL."""
+    try:
+        conn = await asyncpg.connect(POSTGRES_URL)
+
+        # Variant distribution
+        variant_dist = await conn.fetch("""
+            SELECT
+                COALESCE(model_variant, 'rules-only') as variant,
+                COUNT(*) as count,
+                AVG(ml_score) as avg_ml_score,
+                AVG(risk_score) as avg_risk_score
+            FROM transaction_evidence
+            WHERE captured_at > NOW() - INTERVAL '24 hours'
+            GROUP BY model_variant
+            ORDER BY count DESC
+        """)
+
+        # ML score distribution (for histogram)
+        ml_scores = await conn.fetch("""
+            SELECT ml_score
+            FROM transaction_evidence
+            WHERE ml_score IS NOT NULL
+              AND captured_at > NOW() - INTERVAL '24 hours'
+        """)
+
+        # Decision by variant
+        decision_by_variant = await conn.fetch("""
+            SELECT
+                COALESCE(model_variant, 'rules-only') as variant,
+                decision,
+                COUNT(*) as count
+            FROM transaction_evidence
+            WHERE captured_at > NOW() - INTERVAL '24 hours'
+            GROUP BY model_variant, decision
+            ORDER BY variant, decision
+        """)
+
+        await conn.close()
+
+        return {
+            "variant_distribution": [dict(r) for r in variant_dist],
+            "ml_scores": [float(r["ml_score"]) for r in ml_scores if r["ml_score"] is not None],
+            "decision_by_variant": [dict(r) for r in decision_by_variant],
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 async def get_decision_history(limit: int = 100) -> pd.DataFrame:
     """Query decision history from PostgreSQL."""
     try:
@@ -395,6 +454,8 @@ async def get_decision_history(limit: int = 100) -> pd.DataFrame:
                 risk_score,
                 criminal_score,
                 friendly_fraud_score,
+                ml_score,
+                model_variant,
                 amount_cents,
                 card_token,
                 COALESCE(service_id, merchant_id) AS service_id,
@@ -912,6 +973,24 @@ def main():
 
         st.divider()
 
+        # ML Model Status
+        st.subheader("ML Scoring")
+        registry = get_model_registry()
+        if registry:
+            champion = registry.get("champion")
+            challenger = registry.get("challenger")
+            if champion:
+                st.markdown(f"**Champion:** `{champion.get('name', 'N/A')}`")
+                st.markdown(f"  AUC: {champion.get('auc', 0):.4f} | {champion.get('framework', '?')}")
+            if challenger:
+                st.markdown(f"**Challenger:** `{challenger.get('name', 'N/A')}`")
+                st.markdown(f"  AUC: {challenger.get('auc', 0):.4f} | {challenger.get('framework', '?')}")
+            st.markdown("✅ ML Enabled")
+        else:
+            st.markdown("⚠️ No models registered")
+
+        st.divider()
+
         # API Info
         st.subheader("API Endpoints")
         st.code(f"Health: {API_URL}/health")
@@ -932,6 +1011,7 @@ def main():
         "🎯 Transaction Simulator",
         "📊 Analytics Dashboard",
         "📜 Decision History",
+        "🤖 ML Performance",
         "⚙️ Policy Inspector",
         "🔧 Policy Settings"
     ])
@@ -1059,7 +1139,9 @@ def main():
                 st.markdown("#### Risk Scores")
                 scores = result.get("scores", {})
 
-                gauge_cols = st.columns(4)
+                has_ml = scores.get("ml_score") is not None
+                n_gauges = 5 if has_ml else 4
+                gauge_cols = st.columns(n_gauges)
                 with gauge_cols[0]:
                     fig = create_score_gauge(scores.get("risk_score", 0), "Overall Risk")
                     st.plotly_chart(fig, use_container_width=True)
@@ -1072,10 +1154,27 @@ def main():
                 with gauge_cols[3]:
                     fig = create_score_gauge(scores.get("bot_score", 0), "Bot Score")
                     st.plotly_chart(fig, use_container_width=True)
+                if has_ml:
+                    with gauge_cols[4]:
+                        fig = create_score_gauge(scores.get("ml_score", 0), "ML Model")
+                        st.plotly_chart(fig, use_container_width=True)
+
+                # ML Model info bar
+                if has_ml:
+                    ml_cols = st.columns(3)
+                    with ml_cols[0]:
+                        variant = scores.get("model_variant", "unknown")
+                        variant_colors = {"champion": "#10b981", "challenger": "#f59e0b", "holdout": "#6b7280"}
+                        color = variant_colors.get(variant, "#6b7280")
+                        st.markdown(f'<span style="background-color:{color};color:white;padding:4px 12px;border-radius:9999px;font-weight:600;font-size:0.85rem;">{variant.upper()}</span>', unsafe_allow_html=True)
+                    with ml_cols[1]:
+                        st.markdown(f"**Model:** `{scores.get('model_version', 'N/A')}`")
+                    with ml_cols[2]:
+                        st.markdown(f"**ML Score:** {scores.get('ml_score', 0)*100:.1f}%")
 
                 # Detailed scores
                 with st.expander("Detailed Score Breakdown"):
-                    score_cols = st.columns(4)
+                    score_cols = st.columns(5 if has_ml else 4)
                     with score_cols[0]:
                         st.metric("Card Testing", f"{scores.get('card_testing_score', 0)*100:.1f}%")
                     with score_cols[1]:
@@ -1084,6 +1183,9 @@ def main():
                         st.metric("Geo Anomaly", f"{scores.get('geo_score', 0)*100:.1f}%")
                     with score_cols[3]:
                         st.metric("Confidence", f"{scores.get('confidence', 0)*100:.1f}%")
+                    if has_ml:
+                        with score_cols[4]:
+                            st.metric("ML Score", f"{scores.get('ml_score', 0)*100:.1f}%")
 
                 st.divider()
 
@@ -1288,12 +1390,14 @@ def main():
             # Format columns
             df["amount"] = df["amount_cents"].apply(lambda x: f"${x/100:,.2f}")
             df["risk"] = df["risk_score"].apply(lambda x: f"{x*100:.1f}%" if x else "N/A")
+            df["ml"] = df["ml_score"].apply(lambda x: f"{x*100:.1f}%" if x and x > 0 else "-")
+            df["variant"] = df["model_variant"].apply(lambda x: x if x else "rules")
             df["latency"] = df["processing_time_ms"].apply(lambda x: f"{x:.1f}ms" if x else "N/A")
             df["time"] = pd.to_datetime(df["captured_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
 
             # Display table
             st.dataframe(
-                df[["transaction_id", "decision", "amount", "risk", "latency", "time"]],
+                df[["transaction_id", "decision", "amount", "risk", "ml", "variant", "latency", "time"]],
                 use_container_width=True,
                 hide_index=True,
                 column_config={
@@ -1301,6 +1405,8 @@ def main():
                     "decision": st.column_config.TextColumn("Decision", width="small"),
                     "amount": st.column_config.TextColumn("Amount", width="small"),
                     "risk": st.column_config.TextColumn("Risk Score", width="small"),
+                    "ml": st.column_config.TextColumn("ML Score", width="small"),
+                    "variant": st.column_config.TextColumn("Variant", width="small"),
                     "latency": st.column_config.TextColumn("Latency", width="small"),
                     "time": st.column_config.TextColumn("Time", width="medium"),
                 }
@@ -1325,9 +1431,186 @@ def main():
             st.info("No transaction history found. Submit some transactions first.")
 
     # ==========================================================================
-    # Tab 4: Policy Inspector
+    # Tab 4: ML Performance
     # ==========================================================================
     with tabs[3]:
+        st.subheader("ML Model Performance")
+
+        # Model registry info
+        registry = get_model_registry()
+        if registry:
+            st.markdown("#### Model Registry")
+            reg_cols = st.columns(2)
+
+            champion = registry.get("champion")
+            challenger = registry.get("challenger")
+
+            with reg_cols[0]:
+                st.markdown("##### Champion Model")
+                if champion:
+                    st.markdown(f"**Name:** `{champion.get('name', 'N/A')}`")
+                    st.markdown(f"**Framework:** {champion.get('framework', 'N/A')}")
+                    st.markdown(f"**AUC:** {champion.get('auc', 0):.4f}")
+                    st.markdown(f"**Features:** {len(champion.get('feature_columns', []))}")
+                    trained = champion.get("trained_at", "")[:19].replace("T", " ") if champion.get("trained_at") else "N/A"
+                    st.markdown(f"**Trained:** {trained}")
+                    training_window = champion.get("training_window", {})
+                    if training_window:
+                        start = training_window.get("start", "")[:10]
+                        end = training_window.get("end", "")[:10]
+                        st.markdown(f"**Window:** {start} to {end}")
+                else:
+                    st.info("No champion model registered")
+
+            with reg_cols[1]:
+                st.markdown("##### Challenger Model")
+                if challenger:
+                    st.markdown(f"**Name:** `{challenger.get('name', 'N/A')}`")
+                    st.markdown(f"**Framework:** {challenger.get('framework', 'N/A')}")
+                    st.markdown(f"**AUC:** {challenger.get('auc', 0):.4f}")
+                    st.markdown(f"**Features:** {len(challenger.get('feature_columns', []))}")
+                    trained = challenger.get("trained_at", "")[:19].replace("T", " ") if challenger.get("trained_at") else "N/A"
+                    st.markdown(f"**Trained:** {trained}")
+                    training_window = challenger.get("training_window", {})
+                    if training_window:
+                        start = training_window.get("start", "")[:10]
+                        end = training_window.get("end", "")[:10]
+                        st.markdown(f"**Window:** {start} to {end}")
+                else:
+                    st.info("No challenger model registered")
+
+            # AUC comparison bar chart
+            if champion and challenger:
+                st.markdown("#### AUC Comparison")
+                auc_data = pd.DataFrame({
+                    "Model": [f"Champion ({champion.get('framework', '?')})", f"Challenger ({challenger.get('framework', '?')})"],
+                    "AUC": [champion.get("auc", 0), challenger.get("auc", 0)]
+                })
+                fig = px.bar(
+                    auc_data, x="Model", y="AUC",
+                    color="Model",
+                    color_discrete_sequence=["#10b981", "#f59e0b"],
+                    text="AUC"
+                )
+                fig.update_traces(texttemplate='%{text:.4f}', textposition='outside')
+                fig.update_layout(
+                    yaxis_range=[0.8, 1.0],
+                    showlegend=False,
+                    height=300,
+                    margin=dict(l=20, r=20, t=20, b=20),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font={'color': _DARK_TEXT},
+                )
+                fig.add_hline(y=0.85, line_dash="dash", line_color="red", annotation_text="Min AUC: 0.85")
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("No model registry found. Ensure models/registry.json exists.")
+
+        st.divider()
+
+        # ML analytics from DB
+        st.markdown("#### Live Traffic Analytics (24h)")
+        try:
+            ml_analytics = asyncio.run(get_ml_analytics())
+        except Exception as e:
+            ml_analytics = {"error": str(e)}
+
+        if "error" in ml_analytics:
+            st.warning(f"Could not load ML analytics: {ml_analytics.get('error')}")
+            st.info("Submit transactions with ML enabled to generate analytics data.")
+        else:
+            # Variant distribution
+            variant_data = ml_analytics.get("variant_distribution", [])
+            if variant_data:
+                st.markdown("##### Traffic Routing Distribution")
+                vdf = pd.DataFrame(variant_data)
+
+                v_cols = st.columns(2)
+                with v_cols[0]:
+                    variant_colors = {
+                        "champion": "#10b981",
+                        "challenger": "#f59e0b",
+                        "holdout": "#6b7280",
+                        "rules-only": "#3b82f6"
+                    }
+                    fig = px.pie(
+                        vdf, values="count", names="variant",
+                        color="variant",
+                        color_discrete_map=variant_colors,
+                        hole=0.4
+                    )
+                    fig.update_layout(
+                        height=300,
+                        margin=dict(l=20, r=20, t=20, b=20),
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font={'color': _DARK_TEXT},
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+                with v_cols[1]:
+                    # Summary metrics table
+                    for row in variant_data:
+                        variant = row.get("variant", "unknown")
+                        count = row.get("count", 0)
+                        avg_ml = row.get("avg_ml_score")
+                        avg_risk = row.get("avg_risk_score")
+                        ml_str = f"{avg_ml*100:.1f}%" if avg_ml else "-"
+                        risk_str = f"{avg_risk*100:.1f}%" if avg_risk else "-"
+                        st.markdown(f"**{variant}**: {count:,} txns | ML avg: {ml_str} | Risk avg: {risk_str}")
+
+            # ML score distribution histogram
+            ml_scores_list = ml_analytics.get("ml_scores", [])
+            if ml_scores_list:
+                st.markdown("##### ML Score Distribution")
+                score_df = pd.DataFrame({"ml_score": ml_scores_list})
+                fig = px.histogram(
+                    score_df, x="ml_score", nbins=50,
+                    color_discrete_sequence=["#8b5cf6"],
+                    labels={"ml_score": "ML Score"}
+                )
+                fig.update_layout(
+                    height=300,
+                    margin=dict(l=20, r=20, t=20, b=20),
+                    xaxis_title="ML Score",
+                    yaxis_title="Count",
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font={'color': _DARK_TEXT},
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+            # Decision distribution by variant
+            decision_variant_data = ml_analytics.get("decision_by_variant", [])
+            if decision_variant_data:
+                st.markdown("##### Decisions by Model Variant")
+                dvdf = pd.DataFrame(decision_variant_data)
+                decision_colors = {
+                    "ALLOW": "#10b981",
+                    "FRICTION": "#f59e0b",
+                    "REVIEW": "#f97316",
+                    "BLOCK": "#ef4444"
+                }
+                fig = px.bar(
+                    dvdf, x="variant", y="count", color="decision",
+                    color_discrete_map=decision_colors,
+                    barmode="group",
+                    labels={"variant": "Model Variant", "count": "Transactions"}
+                )
+                fig.update_layout(
+                    height=350,
+                    margin=dict(l=20, r=20, t=20, b=20),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font={'color': _DARK_TEXT},
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.25),
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+    # ==========================================================================
+    # Tab 5: Policy Inspector
+    # ==========================================================================
+    with tabs[4]:
         st.subheader("Policy Inspector")
 
         # Load policy file
@@ -1404,9 +1687,9 @@ def main():
             st.error(f"Could not load policy: {e}")
 
     # ==========================================================================
-    # Tab 5: Policy Settings
+    # Tab 6: Policy Settings
     # ==========================================================================
-    with tabs[4]:
+    with tabs[5]:
         st.subheader("Policy Settings")
         st.markdown("*Manage policy configuration with full version control*")
 

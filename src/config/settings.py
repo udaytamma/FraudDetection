@@ -200,7 +200,7 @@ class Settings(BaseSettings):
     # ML Scoring (Phase 2)
     # =========================================================================
     ml_enabled: bool = Field(
-        default=False,
+        default=True,
         description="Enable ML scoring (Phase 2)"
     )
     ml_registry_path: str = Field(

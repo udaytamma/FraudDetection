@@ -49,7 +49,7 @@ class GeoAnomalyDetector(BaseDetector):
     def __init__(
         self,
         max_travel_speed_kmh: float = MAX_TRAVEL_SPEED_KMH,
-        high_risk_countries: set[str] = None,
+        high_risk_countries: Optional[set[str]] = None,
     ):
         """
         Initialize detector.

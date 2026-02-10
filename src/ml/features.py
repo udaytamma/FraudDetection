@@ -74,9 +74,9 @@ def extract_feature_dict(features: FeatureSet) -> dict[str, float]:
         "user_amount_24h_cents": velocity.user_amount_24h_cents,
         "card_decline_rate_1h": velocity.card_decline_rate_1h,
         # Entity
-        "card_age_hours": entity.card_age_hours or 0,
-        "device_age_hours": entity.device_age_hours or 0,
-        "user_account_age_days": entity.user_account_age_days,
+        "card_age_hours": entity.card_age_hours or 0.0,
+        "device_age_hours": entity.device_age_hours or 0.0,
+        "user_account_age_days": entity.user_account_age_days or 0.0,
         "user_chargeback_count_lifetime": entity.user_chargeback_count,
         "user_chargeback_rate_90d": entity.user_chargeback_rate_90d,
         "user_refund_count_90d": entity.user_refund_count_90d,
@@ -127,7 +127,7 @@ def extract_from_snapshot(snapshot: dict[str, Any]) -> dict[str, float]:
         declines_1h = _as_number(velocity.get("card_declines_1h"))
         decline_rate_1h = declines_1h / attempts_1h if attempts_1h > 0 else 0.0
 
-    values: dict[str, float] = {
+    values: dict[str, Any] = {
         "card_attempts_10m": velocity.get("card_attempts_10m"),
         "card_attempts_1h": velocity.get("card_attempts_1h"),
         "card_attempts_24h": velocity.get("card_attempts_24h"),

@@ -128,7 +128,7 @@ class DetectionEngine:
         for detector, result in zip(self.detectors, results):
             detector_name = detector.__class__.__name__
 
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 # Detector failed - log and continue with neutral result
                 results_by_detector[detector_name] = DetectionResult(score=0.0)
                 continue

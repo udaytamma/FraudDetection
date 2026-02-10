@@ -17,7 +17,7 @@ import asyncio
 import time
 from datetime import datetime, timedelta, UTC
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from typing import Optional
+from typing import Any, Optional
 
 import redis.asyncio as redis
 
@@ -134,7 +134,7 @@ class FeatureStore:
 
     async def _get_card_velocity(self, card_token: str) -> dict:
         """Get velocity features for a card."""
-        counts = {}
+        counts: dict[str, int] = {}
 
         # Get all card velocity metrics in parallel
         results = await asyncio.gather(
@@ -233,8 +233,8 @@ class FeatureStore:
         Returns:
             EntityProfiles with all available profiles
         """
-        tasks = []
-        keys = []
+        tasks: list[Any] = []
+        keys: list[str] = []
 
         # Queue profile lookups
         if event.card_token:
@@ -272,7 +272,7 @@ class FeatureStore:
     async def _get_card_profile(self, card_token: str) -> Optional[CardProfile]:
         """Get card profile from Redis hash."""
         key = f"{self.prefix}profile:card:{card_token}"
-        data = await self.redis.hgetall(key)
+        data = await self.redis.hgetall(key)  # type: ignore[misc]
 
         if not data:
             return None
@@ -291,7 +291,7 @@ class FeatureStore:
     async def _get_device_profile(self, device_id: str) -> Optional[DeviceProfile]:
         """Get device profile from Redis hash."""
         key = f"{self.prefix}profile:device:{device_id}"
-        data = await self.redis.hgetall(key)
+        data = await self.redis.hgetall(key)  # type: ignore[misc]
 
         if not data:
             return None
@@ -311,7 +311,7 @@ class FeatureStore:
     async def _get_ip_profile(self, ip_address: str) -> Optional[IPProfile]:
         """Get IP profile from Redis hash."""
         key = f"{self.prefix}profile:ip:{ip_address}"
-        data = await self.redis.hgetall(key)
+        data = await self.redis.hgetall(key)  # type: ignore[misc]
 
         if not data:
             return None
@@ -334,7 +334,7 @@ class FeatureStore:
     async def _get_user_profile(self, user_id: str) -> Optional[UserProfile]:
         """Get user profile from Redis hash."""
         key = f"{self.prefix}profile:user:{user_id}"
-        data = await self.redis.hgetall(key)
+        data = await self.redis.hgetall(key)  # type: ignore[misc]
 
         if not data:
             return None
@@ -357,7 +357,7 @@ class FeatureStore:
     async def _get_service_profile(self, service_id: str) -> Optional[ServiceProfile]:
         """Get service profile from Redis hash."""
         key = f"{self.prefix}profile:service:{service_id}"
-        data = await self.redis.hgetall(key)
+        data = await self.redis.hgetall(key)  # type: ignore[misc]
 
         if not data:
             return None
@@ -373,7 +373,7 @@ class FeatureStore:
     async def _get_merchant_profile(self, merchant_id: str) -> Optional[MerchantProfile]:
         """Get merchant profile from Redis hash."""
         key = f"{self.prefix}profile:merchant:{merchant_id}"
-        data = await self.redis.hgetall(key)
+        data = await self.redis.hgetall(key)  # type: ignore[misc]
 
         if not data:
             return None
@@ -499,7 +499,8 @@ class FeatureStore:
         now_ms: int,
     ) -> None:
         """Update device profile and velocity counters."""
-        device_id = event.device_id
+        assert event.device_id is not None
+        device_id: str = event.device_id
         tx_id = event.transaction_id
 
         pipe = self.redis.pipeline()
@@ -542,7 +543,8 @@ class FeatureStore:
         now_ms: int,
     ) -> None:
         """Update IP profile and velocity counters."""
-        ip_address = event.ip_address
+        assert event.ip_address is not None
+        ip_address: str = event.ip_address
         tx_id = event.transaction_id
 
         pipe = self.redis.pipeline()
@@ -582,7 +584,8 @@ class FeatureStore:
         now_ms: int,
     ) -> None:
         """Update user profile and velocity counters."""
-        user_id = event.user_id
+        assert event.user_id is not None
+        user_id: str = event.user_id
         tx_id = event.transaction_id
 
         pipe = self.redis.pipeline()
@@ -616,12 +619,12 @@ class FeatureStore:
         pipe.hincrby(profile_key, "total_transactions", 1)
         pipe.hincrby(profile_key, "transactions_30d", 1)
         pipe.hincrby(profile_key, "total_amount_cents", event.amount_cents)
-        pipe.hset(profile_key, "amount_count", amount_count)
-        pipe.hset(profile_key, "amount_mean_cents", amount_mean)
-        pipe.hset(profile_key, "amount_m2_cents", amount_m2)
+        pipe.hset(profile_key, "amount_count", str(amount_count))
+        pipe.hset(profile_key, "amount_mean_cents", str(amount_mean))
+        pipe.hset(profile_key, "amount_m2_cents", str(amount_m2))
 
         if event.account_age_days is not None:
-            pipe.hset(profile_key, "account_age_days", event.account_age_days)
+            pipe.hset(profile_key, "account_age_days", str(event.account_age_days))
 
         pipe.expire(profile_key, self.WINDOW_30D)
         await pipe.execute()
@@ -636,7 +639,7 @@ class FeatureStore:
 
         Returns updated (count, mean, m2).
         """
-        existing = await self.redis.hmget(
+        existing = await self.redis.hmget(  # type: ignore[misc]
             profile_key,
             "amount_count",
             "amount_mean_cents",

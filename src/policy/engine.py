@@ -22,7 +22,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 logger = logging.getLogger("fraud_detection.policy")
 
@@ -47,7 +47,7 @@ class PolicyEngine:
 
     def __init__(
         self,
-        policy: PolicyRules = None,
+        policy: Optional[PolicyRules] = None,
         policy_path: Optional[Path] = None,
     ):
         """
@@ -279,25 +279,25 @@ class PolicyEngine:
 
         return None
 
-    def _check_condition(self, key: str, actual, expected) -> bool:
+    def _check_condition(self, key: str, actual, expected) -> bool:  # type: ignore[no-untyped-def]
         """Check if a condition is met."""
         if actual is None:
             return False
 
         # Handle comparison operators in key
         if key.endswith("_gte"):
-            return actual >= expected
+            return bool(actual >= expected)
         if key.endswith("_gt"):
-            return actual > expected
+            return bool(actual > expected)
         if key.endswith("_lte"):
-            return actual <= expected
+            return bool(actual <= expected)
         if key.endswith("_lt"):
-            return actual < expected
+            return bool(actual < expected)
         if key.endswith("_ne"):
-            return actual != expected
+            return bool(actual != expected)
 
         # Default: equality check
-        return actual == expected
+        return bool(actual == expected)
 
     def _apply_thresholds(
         self,

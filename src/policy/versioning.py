@@ -19,10 +19,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple, List
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine, async_sessionmaker
 
 from .rules import PolicyRules, ScoreThreshold, PolicyRule, RuleAction, FrictionType
 
@@ -113,8 +113,8 @@ class PolicyVersioningService:
         """
         self.database_url = database_url
         self.policy_path = policy_path
-        self.engine = None
-        self.session_factory = None
+        self.engine: Optional[AsyncEngine] = None
+        self.session_factory: Optional[async_sessionmaker[AsyncSession]] = None
         self._current_version_id: Optional[int] = None
 
     async def initialize(self) -> None:
@@ -245,6 +245,7 @@ class PolicyVersioningService:
         # Convert policy to JSON-serializable dict
         policy_dict = json.loads(policy.model_dump_json())
 
+        assert self.session_factory is not None
         async with self.session_factory() as session:
             # Deactivate current active version
             await session.execute(
@@ -274,6 +275,7 @@ class PolicyVersioningService:
                 },
             )
             row = result.fetchone()
+            assert row is not None
             await session.commit()
 
             # Cache current version ID
@@ -349,6 +351,7 @@ class PolicyVersioningService:
 
     async def get_version(self, version: str) -> Optional[PolicyVersion]:
         """Get a specific policy version by version string."""
+        assert self.session_factory is not None
         async with self.session_factory() as session:
             result = await session.execute(
                 text("""
@@ -378,6 +381,7 @@ class PolicyVersioningService:
 
     async def get_version_by_id(self, version_id: int) -> Optional[PolicyVersion]:
         """Get a specific policy version by ID."""
+        assert self.session_factory is not None
         async with self.session_factory() as session:
             result = await session.execute(
                 text("""
@@ -407,6 +411,7 @@ class PolicyVersioningService:
 
     async def list_versions(self, limit: int = 50) -> List[PolicyVersion]:
         """List policy versions, most recent first."""
+        assert self.session_factory is not None
         async with self.session_factory() as session:
             result = await session.execute(
                 text("""

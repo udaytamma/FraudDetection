@@ -19,7 +19,7 @@ from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine, async_sessionmaker
 
 from ..config import settings
 from ..metrics import metrics
@@ -36,7 +36,7 @@ from ..schemas import (
 try:
     from cryptography.fernet import Fernet
 except Exception:  # pragma: no cover - optional dependency for vault encryption
-    Fernet = None
+    Fernet = None  # type: ignore[assignment, misc]
 
 
 class EvidenceService:
@@ -58,8 +58,8 @@ class EvidenceService:
             database_url: PostgreSQL connection URL
         """
         self.database_url = database_url
-        self.engine = None
-        self.session_factory = None
+        self.engine: Optional[AsyncEngine] = None
+        self.session_factory: Optional[async_sessionmaker[AsyncSession]] = None
 
     async def initialize(self) -> None:
         """Initialize database connection."""
@@ -471,8 +471,8 @@ class EvidenceService:
                 return None
             payload = row["response_json"]
             if isinstance(payload, str):
-                return json.loads(payload)
-            return payload
+                return dict(json.loads(payload))
+            return dict(payload)
 
     async def store_idempotency_response(
         self,

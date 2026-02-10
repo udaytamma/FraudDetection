@@ -97,7 +97,7 @@ class VelocityCounter:
         pipe.expire(key, ttl)
 
         results = await pipe.execute()
-        return results[0]  # Number of elements added
+        return int(results[0])  # Number of elements added
 
     async def count(
         self,
@@ -124,7 +124,7 @@ class VelocityCounter:
 
         # Count events with score >= window_start_ms
         count = await self.redis.zcount(key, window_start_ms, now_ms)
-        return count
+        return int(count)
 
     async def count_distinct(
         self,
@@ -186,7 +186,7 @@ class VelocityCounter:
         pipe.expire(key, ttl)
 
         results = await pipe.execute()
-        return results[0]
+        return int(results[0])
 
     async def has_distinct(
         self,
@@ -208,7 +208,7 @@ class VelocityCounter:
         if window_seconds is None:
             return True
         now_ms = int(time.time() * 1000)
-        return score >= now_ms - (window_seconds * 1000)
+        return bool(score >= now_ms - (window_seconds * 1000))
 
     async def cleanup_expired(
         self,
@@ -236,7 +236,7 @@ class VelocityCounter:
 
         # Remove all events with score < cutoff
         removed = await self.redis.zremrangebyscore(key, 0, cutoff_ms)
-        return removed
+        return int(removed)
 
     async def get_all_counts(
         self,

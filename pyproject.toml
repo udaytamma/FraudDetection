@@ -1,0 +1,59 @@
+[project]
+name = "fraud-detection"
+version = "1.0.0"
+description = "Real-time fraud detection platform for payment transactions"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "Uday Tamma", email = "uday@zeroleaf.dev"}]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+# Allow implicit Optional (common Python pattern: def foo(x=None))
+implicit_optional = true
+# Don't require complete type annotations
+disallow_untyped_defs = false
+# These cause issues with third-party libraries
+disable_error_code = [
+    "misc",           # Catches await on union types (redis library issue)
+    "prop-decorator", # Catches decorator stacking on @property (pydantic)
+    "arg-type",       # Too strict for redis library
+]
+
+# Per-module overrides for stricter checking on our code
+[[tool.mypy.overrides]]
+module = "src.api.*"
+disallow_untyped_defs = false
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = [
+    "redis.*",
+    "xgboost.*",
+    "lightgbm.*",
+    "yaml.*",
+    "geopy.*",
+    "sklearn.*",
+]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

@@ -368,6 +368,18 @@ class EntityFeatures(BaseModel):
     )
 
     # ==========================================================================
+    # Merchant Features
+    # ==========================================================================
+    merchant_is_high_risk_mcc: bool = Field(
+        default=False,
+        description="Merchant MCC is high-risk",
+    )
+    merchant_chargeback_rate_30d: float = Field(
+        default=0.0,
+        description="Merchant chargeback rate in last 30 days",
+    )
+
+    # ==========================================================================
     # Cross-Entity Features
     # ==========================================================================
     card_user_match: bool = Field(

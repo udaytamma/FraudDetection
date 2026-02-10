@@ -67,7 +67,7 @@ class Settings(BaseSettings):
         description="Redis password (optional)"
     )
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def redis_url(self) -> str:
         """Construct Redis connection URL."""
@@ -94,10 +94,11 @@ class Settings(BaseSettings):
         description="PostgreSQL username"
     )
     postgres_password: str = Field(
+        default="",
         description="PostgreSQL password (required - set via POSTGRES_PASSWORD env var)"
     )
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def postgres_url(self) -> str:
         """Construct PostgreSQL connection URL for asyncpg."""
@@ -106,7 +107,7 @@ class Settings(BaseSettings):
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def postgres_sync_url(self) -> str:
         """Construct PostgreSQL connection URL for sync operations (migrations)."""
@@ -246,7 +247,7 @@ class Settings(BaseSettings):
         description="Retention window (hours) for idempotency records"
     )
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def cors_allow_origins_list(self) -> list[str]:
         """Return CORS origins as a list."""

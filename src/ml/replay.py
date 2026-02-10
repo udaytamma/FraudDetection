@@ -104,10 +104,10 @@ def _load_model(model_path: str, model_type: str):
 
 def _predict(model: object, model_type: str, X: np.ndarray) -> np.ndarray:
     if model_type == "xgb_classifier":
-        probas = model.predict_proba(X)[:, 1]
-        return probas
+        probas = model.predict_proba(X)[:, 1]  # type: ignore[attr-defined]
+        return np.asarray(probas)
     if model_type == "lgbm_classifier":
-        probas = model.predict(X)
+        probas = model.predict(X)  # type: ignore[attr-defined]
         return np.asarray(probas)
     raise ValueError(f"Unsupported model_type: {model_type}")
 

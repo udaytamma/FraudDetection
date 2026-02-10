@@ -88,9 +88,9 @@ class MLScorer:
             except Exception as exc:  # pragma: no cover - optional dependency
                 logger.warning("lightgbm not available: %s", exc)
                 return None
-            model = lgb.Booster(model_file=str(model_path))
-            self._models[cache_key] = model
-            return model
+            lgbm_model = lgb.Booster(model_file=str(model_path))
+            self._models[cache_key] = lgbm_model
+            return lgbm_model
 
         logger.warning("Unsupported model_type: %s", model_type)
         return None
@@ -99,13 +99,13 @@ class MLScorer:
         if model_type == "xgb_classifier":
             import numpy as np
             vector_np = np.array(vector, dtype=float).reshape(1, -1)
-            proba = model.predict_proba(vector_np)
+            proba = model.predict_proba(vector_np)  # type: ignore[attr-defined]
             return float(proba[0][1])
 
         if model_type == "lgbm_classifier":
             import numpy as np
             vector_np = np.array(vector, dtype=float).reshape(1, -1)
-            proba = model.predict(vector_np)
+            proba = model.predict(vector_np)  # type: ignore[attr-defined]
             if hasattr(proba, '__len__') and len(proba) > 0:
                 return float(proba[0])
             return float(proba)

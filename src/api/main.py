@@ -56,6 +56,45 @@ model_monitor: Optional[ModelMonitor] = None
 CRIMINAL_REASON_CODES = {"10.1", "10.2", "10.3", "10.4", "10.5"}
 
 
+# =============================================================================
+# SERVICE ACCESSOR HELPERS (narrow Optional types with proper error handling)
+# =============================================================================
+
+def _require_policy_engine() -> PolicyEngine:
+    """Get policy engine, raising 503 if not initialized."""
+    if policy_engine is None:
+        raise HTTPException(status_code=503, detail="Policy engine not initialized")
+    return policy_engine
+
+
+def _require_policy_versioning() -> PolicyVersioningService:
+    """Get policy versioning service, raising 503 if not initialized."""
+    if policy_versioning is None:
+        raise HTTPException(status_code=503, detail="Policy versioning service not initialized")
+    return policy_versioning
+
+
+def _require_evidence_service() -> EvidenceService:
+    """Get evidence service, raising 503 if not initialized."""
+    if evidence_service is None:
+        raise HTTPException(status_code=503, detail="Evidence service not initialized")
+    return evidence_service
+
+
+def _require_feature_store() -> FeatureStore:
+    """Get feature store, raising 503 if not initialized."""
+    if feature_store is None:
+        raise HTTPException(status_code=503, detail="Feature store not initialized")
+    return feature_store
+
+
+def _require_risk_scorer() -> RiskScorer:
+    """Get risk scorer, raising 503 if not initialized."""
+    if risk_scorer is None:
+        raise HTTPException(status_code=503, detail="Risk scorer not initialized")
+    return risk_scorer
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -79,7 +118,7 @@ async def lifespan(app: FastAPI):
 
     # Verify Redis connection
     try:
-        await redis_client.ping()
+        await redis_client.ping()  # type: ignore[misc]
     except Exception as e:
         logger.warning("Redis connection failed: %s", e)
         # Continue without Redis for testing
@@ -223,6 +262,12 @@ async def make_decision(
         # Track request
         metrics.requests_total.labels(endpoint="/decide").inc()
 
+        # Get required services (raises 503 if not initialized)
+        fs = _require_feature_store()
+        scorer = _require_risk_scorer()
+        engine = _require_policy_engine()
+        ev_service = _require_evidence_service()
+
         # Safe mode: bypass decisioning for controlled fallback
         if settings.safe_mode_enabled:
             safe_time = (time.perf_counter() - start_time) * 1000
@@ -238,7 +283,7 @@ async def make_decision(
             # Capture evidence for auditability (zeroed scores, no computed features)
             safe_features = FeatureSet()
             _fire_and_forget(
-                evidence_service.capture_evidence(
+                ev_service.capture_evidence(
                     event, safe_features, response.scores, response,
                     policy_version_id=None,
                 ),
@@ -259,7 +304,7 @@ async def make_decision(
         # Step 2: Compute features
         # =======================================================================
         feature_start = time.perf_counter()
-        features = await feature_store.compute_features(event)
+        features = await fs.compute_features(event)
         feature_time = (time.perf_counter() - feature_start) * 1000
 
         # Track feature latency
@@ -269,7 +314,7 @@ async def make_decision(
         # Step 3: Compute risk scores
         # =======================================================================
         scoring_start = time.perf_counter()
-        scores, score_reasons = await risk_scorer.compute_scores(event, features)
+        scores, score_reasons = await scorer.compute_scores(event, features)
         scoring_time = (time.perf_counter() - scoring_start) * 1000
 
         # Track scoring latency
@@ -279,7 +324,7 @@ async def make_decision(
         # Step 4: Evaluate policy
         # =======================================================================
         policy_start = time.perf_counter()
-        decision, policy_reasons, friction_type, review_priority = policy_engine.evaluate(
+        decision, policy_reasons, friction_type, review_priority = engine.evaluate(
             event, features, scores
         )
         policy_time = (time.perf_counter() - policy_start) * 1000
@@ -309,7 +354,7 @@ async def make_decision(
             feature_time_ms=round(feature_time, 2),
             scoring_time_ms=round(scoring_time, 2),
             policy_time_ms=round(policy_time, 2),
-            policy_version=policy_engine.version,
+            policy_version=engine.version,
             is_cached=False,
         )
 
@@ -318,7 +363,7 @@ async def make_decision(
         # =======================================================================
         is_decline = decision == Decision.BLOCK
         _fire_and_forget(
-            feature_store.update_entity_profiles(event, is_decline),
+            fs.update_entity_profiles(event, is_decline),
             "update_entity_profiles",
         )
 
@@ -327,7 +372,7 @@ async def make_decision(
         # =======================================================================
         policy_version_id = policy_versioning.current_version_id if policy_versioning else None
         _fire_and_forget(
-            evidence_service.capture_evidence(
+            ev_service.capture_evidence(
                 event, features, scores, response, policy_version_id=policy_version_id
             ),
             "capture_evidence",
@@ -442,6 +487,8 @@ def _get_review_notes(reasons: list) -> str:
 def _safe_mode_response(event: PaymentEvent, elapsed_ms: float = 0.0) -> FraudDecisionResponse:
     """Return a deterministic response when safe mode is enabled."""
     decision = Decision[settings.safe_mode_decision]
+    # Safe to access policy_engine here since it's checked before calling this function
+    version = policy_engine.version if policy_engine is not None else "unknown"
     response = FraudDecisionResponse(
         transaction_id=event.transaction_id,
         idempotency_key=event.idempotency_key,
@@ -456,7 +503,7 @@ def _safe_mode_response(event: PaymentEvent, elapsed_ms: float = 0.0) -> FraudDe
         feature_time_ms=0.0,
         scoring_time_ms=0.0,
         policy_time_ms=0.0,
-        policy_version=policy_engine.version if policy_engine else "unknown",
+        policy_version=version,
         is_cached=False,
     )
     return response
@@ -478,20 +525,22 @@ def _fire_and_forget(coro, name: str) -> None:
 @app.get("/policy/version")
 async def get_policy_version(_: None = Depends(require_api_token)):
     """Get current policy version and hash."""
+    engine = _require_policy_engine()
     return {
-        "version": policy_engine.version,
-        "hash": policy_engine.hash,
+        "version": engine.version,
+        "hash": engine.hash,
     }
 
 
 @app.post("/policy/reload")
 async def reload_policy(_: None = Depends(require_admin_token)):
     """Reload policy from configuration file."""
-    if policy_engine.reload_policy():
+    engine = _require_policy_engine()
+    if engine.reload_policy():
         return {
             "status": "success",
-            "version": policy_engine.version,
-            "hash": policy_engine.hash,
+            "version": engine.version,
+            "hash": engine.hash,
         }
     else:
         raise HTTPException(status_code=500, detail="Policy reload failed")
@@ -504,7 +553,8 @@ async def reload_policy(_: None = Depends(require_admin_token)):
 @app.get("/policy")
 async def get_policy(_: None = Depends(require_api_token)):
     """Get the current active policy configuration."""
-    version = await policy_versioning.get_active_version()
+    versioning = _require_policy_versioning()
+    version = await versioning.get_active_version()
     if not version:
         raise HTTPException(status_code=404, detail="No active policy found")
 
@@ -520,7 +570,8 @@ async def get_policy(_: None = Depends(require_api_token)):
 @app.get("/policy/versions")
 async def list_policy_versions(limit: int = 50, _: None = Depends(require_api_token)):
     """List all policy versions, most recent first."""
-    versions = await policy_versioning.list_versions(limit=limit)
+    versioning = _require_policy_versioning()
+    versions = await versioning.list_versions(limit=limit)
     return {
         "versions": [
             {
@@ -538,9 +589,10 @@ async def list_policy_versions(limit: int = 50, _: None = Depends(require_api_to
 
 
 @app.get("/policy/versions/{version}")
-async def get_policy_version(version: str, _: None = Depends(require_api_token)):
-    """Get a specific policy version."""
-    v = await policy_versioning.get_version(version)
+async def get_policy_version_by_id(version: str, _: None = Depends(require_api_token)):
+    """Get a specific policy version by its version string."""
+    versioning = _require_policy_versioning()
+    v = await versioning.get_version(version)
     if not v:
         raise HTTPException(status_code=404, detail=f"Version '{version}' not found")
 
@@ -569,11 +621,13 @@ async def update_thresholds(
 
     Validates that friction < review < block for each score type.
     """
+    versioning = _require_policy_versioning()
+    engine = _require_policy_engine()
     try:
-        version = await policy_versioning.update_thresholds(updates, changed_by=changed_by)
+        version = await versioning.update_thresholds(updates, changed_by=changed_by)
 
         # Reload policy engine with new config
-        policy_engine.reload_policy()
+        engine.reload_policy()
 
         return {
             "status": "success",
@@ -591,11 +645,13 @@ async def add_rule(
     _: None = Depends(require_admin_token),
 ):
     """Add a new policy rule."""
+    versioning = _require_policy_versioning()
+    engine = _require_policy_engine()
     try:
-        version = await policy_versioning.add_rule(rule, changed_by=changed_by)
+        version = await versioning.add_rule(rule, changed_by=changed_by)
 
         # Reload policy engine
-        policy_engine.reload_policy()
+        engine.reload_policy()
 
         return {
             "status": "success",
@@ -614,14 +670,16 @@ async def update_rule(
     _: None = Depends(require_admin_token),
 ):
     """Update an existing policy rule."""
+    versioning = _require_policy_versioning()
+    engine = _require_policy_engine()
     if rule.id != rule_id:
         raise HTTPException(status_code=400, detail="Rule ID in path must match body")
 
     try:
-        version = await policy_versioning.update_rule(rule, changed_by=changed_by)
+        version = await versioning.update_rule(rule, changed_by=changed_by)
 
         # Reload policy engine
-        policy_engine.reload_policy()
+        engine.reload_policy()
 
         return {
             "status": "success",
@@ -639,11 +697,13 @@ async def delete_rule(
     _: None = Depends(require_admin_token),
 ):
     """Delete a policy rule."""
+    versioning = _require_policy_versioning()
+    engine = _require_policy_engine()
     try:
-        version = await policy_versioning.delete_rule(rule_id, changed_by=changed_by)
+        version = await versioning.delete_rule(rule_id, changed_by=changed_by)
 
         # Reload policy engine
-        policy_engine.reload_policy()
+        engine.reload_policy()
 
         return {
             "status": "success",
@@ -662,12 +722,14 @@ async def add_to_list(
     _: None = Depends(require_admin_token),
 ):
     """Add a value to a blocklist or allowlist."""
+    versioning = _require_policy_versioning()
+    engine = _require_policy_engine()
     try:
         update = ListUpdate(list_type=list_type, value=value, action="add")
-        version = await policy_versioning.update_list(update, changed_by=changed_by)
+        version = await versioning.update_list(update, changed_by=changed_by)
 
         # Reload policy engine
-        policy_engine.reload_policy()
+        engine.reload_policy()
 
         return {
             "status": "success",
@@ -688,12 +750,14 @@ async def remove_from_list(
     _: None = Depends(require_admin_token),
 ):
     """Remove a value from a blocklist or allowlist."""
+    versioning = _require_policy_versioning()
+    engine = _require_policy_engine()
     try:
         update = ListUpdate(list_type=list_type, value=value, action="remove")
-        version = await policy_versioning.update_list(update, changed_by=changed_by)
+        version = await versioning.update_list(update, changed_by=changed_by)
 
         # Reload policy engine
-        policy_engine.reload_policy()
+        engine.reload_policy()
 
         return {
             "status": "success",
@@ -707,7 +771,7 @@ async def remove_from_list(
 
 
 @app.post("/policy/rollback/{target_version}")
-async def rollback_policy(
+async def rollback_policy_version(
     target_version: str,
     changed_by: str = "system",
     _: None = Depends(require_admin_token),
@@ -718,11 +782,13 @@ async def rollback_policy(
     Creates a new version with the content from the target version.
     Does not delete any history.
     """
+    versioning = _require_policy_versioning()
+    engine = _require_policy_engine()
     try:
-        version = await policy_versioning.rollback(target_version, changed_by=changed_by)
+        version = await versioning.rollback(target_version, changed_by=changed_by)
 
         # Reload policy engine
-        policy_engine.reload_policy()
+        engine.reload_policy()
 
         return {
             "status": "success",
@@ -741,8 +807,9 @@ async def diff_policy_versions(
     _: None = Depends(require_api_token),
 ):
     """Compare two policy versions and return differences."""
-    v1 = await policy_versioning.get_version(version1)
-    v2 = await policy_versioning.get_version(version2)
+    versioning = _require_policy_versioning()
+    v1 = await versioning.get_version(version1)
+    v2 = await versioning.get_version(version2)
 
     if not v1:
         raise HTTPException(status_code=404, detail=f"Version '{version1}' not found")
@@ -750,18 +817,14 @@ async def diff_policy_versions(
         raise HTTPException(status_code=404, detail=f"Version '{version2}' not found")
 
     # Simple diff - compare JSON structures
-    diff = {
-        "version1": version1,
-        "version2": version2,
-        "changes": [],
-    }
+    changes: list[dict] = []
 
     # Compare thresholds
     t1 = v1.policy_content.get("thresholds", {})
     t2 = v2.policy_content.get("thresholds", {})
     for key in set(t1.keys()) | set(t2.keys()):
         if t1.get(key) != t2.get(key):
-            diff["changes"].append({
+            changes.append({
                 "type": "threshold",
                 "key": key,
                 "v1": t1.get(key),
@@ -773,11 +836,11 @@ async def diff_policy_versions(
     r2 = {r["id"]: r for r in v2.policy_content.get("rules", [])}
     for key in set(r1.keys()) | set(r2.keys()):
         if key not in r1:
-            diff["changes"].append({"type": "rule_added", "key": key, "v2": r2[key]})
+            changes.append({"type": "rule_added", "key": key, "v2": r2[key]})
         elif key not in r2:
-            diff["changes"].append({"type": "rule_removed", "key": key, "v1": r1[key]})
+            changes.append({"type": "rule_removed", "key": key, "v1": r1[key]})
         elif r1[key] != r2[key]:
-            diff["changes"].append({"type": "rule_modified", "key": key, "v1": r1[key], "v2": r2[key]})
+            changes.append({"type": "rule_modified", "key": key, "v1": r1[key], "v2": r2[key]})
 
     # Compare lists
     for list_name in ['blocklist_cards', 'blocklist_devices', 'blocklist_ips',
@@ -788,14 +851,18 @@ async def diff_policy_versions(
         added = l2 - l1
         removed = l1 - l2
         if added or removed:
-            diff["changes"].append({
+            changes.append({
                 "type": "list",
                 "key": list_name,
                 "added": list(added),
                 "removed": list(removed),
             })
 
-    return diff
+    return {
+        "version1": version1,
+        "version2": version2,
+        "changes": changes,
+    }
 
 
 # =============================================================================
@@ -813,8 +880,11 @@ async def ingest_chargeback(
     Records the chargeback in PostgreSQL and updates entity risk profiles
     in Redis so that future transactions reflect chargeback history.
     """
+    ev_service = _require_evidence_service()
+    fs = _require_feature_store()
+
     # 1. Record chargeback in Postgres
-    record_id = await evidence_service.record_chargeback(
+    record_id = await ev_service.record_chargeback(
         transaction_id=chargeback.transaction_id,
         chargeback_id=chargeback.chargeback_id,
         amount_cents=chargeback.amount_cents,
@@ -827,12 +897,12 @@ async def ingest_chargeback(
         raise HTTPException(status_code=500, detail="Failed to record chargeback")
 
     # 2. Look up original transaction to find affected entities
-    evidence = await evidence_service.get_evidence(chargeback.transaction_id)
+    evidence = await ev_service.get_evidence(chargeback.transaction_id)
 
     # 3. Update entity profiles in Redis with chargeback signal
     if evidence:
         _fire_and_forget(
-            feature_store.update_chargeback_profiles(
+            fs.update_chargeback_profiles(
                 card_token=evidence.get("card_token"),
                 user_id=evidence.get("user_id"),
                 device_id_hash=evidence.get("device_id_hash"),
@@ -866,7 +936,10 @@ async def ingest_refund(
     Records the refund in PostgreSQL and updates user profiles in Redis
     so that friendly-fraud scoring reflects refund history.
     """
-    record_id = await evidence_service.record_refund(
+    ev_service = _require_evidence_service()
+    fs = _require_feature_store()
+
+    record_id = await ev_service.record_refund(
         transaction_id=refund.transaction_id,
         refund_id=refund.refund_id,
         amount_cents=refund.amount_cents,
@@ -877,11 +950,11 @@ async def ingest_refund(
     if not record_id:
         raise HTTPException(status_code=500, detail="Failed to record refund")
 
-    evidence = await evidence_service.get_evidence(refund.transaction_id)
+    evidence = await ev_service.get_evidence(refund.transaction_id)
 
     if evidence:
         _fire_and_forget(
-            feature_store.update_refund_profiles(
+            fs.update_refund_profiles(
                 user_id=evidence.get("user_id"),
             ),
             "update_refund_profiles",

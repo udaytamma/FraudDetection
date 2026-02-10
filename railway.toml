@@ -1,5 +1,5 @@
 [build]
-builder = "nixpacks"
+builder = "dockerfile"
 
 [deploy]
 restartPolicyType = "on_failure"

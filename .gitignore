@@ -60,3 +60,6 @@ data/
 *.pem
 *.key
 secrets/
+
+# Runtime storage/logs
+storage/

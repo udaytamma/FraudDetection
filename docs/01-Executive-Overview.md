@@ -116,7 +116,7 @@ Real-time decisioning foundation with rule-based detection and gated ML scoring.
 - Immutable evidence vault
 - Prometheus/Grafana monitoring
 - Chargeback + refund ingestion endpoints (manual feed)
-- Test suite includes 190+ pytest cases; measured 260 RPS at 106ms P99 on a single worker (higher capacity is projected, not measured)
+- Test suite includes 205 pytest cases; measured 260 RPS at 106ms P99 on a single worker (higher capacity is projected, not measured)
 
 **Current Status:** MVP complete, ready for shadow deployment
 
@@ -152,7 +152,9 @@ Production hardening and expanded detection.
 
 ## Impact Summary
 
-### Projected Before/After Metrics
+### Projected Impact (Modeled, Not Measured)
+
+**Caveat: Only P99 latency is measured. All other metrics are modeled projections based on industry benchmarks and system design, not observed production data.**
 
 | Metric | Before | After (Phase 1) | After (Phase 2) | Methodology |
 |--------|--------|-----------------|-----------------|-------------|
@@ -162,8 +164,6 @@ Production hardening and expanded detection.
 | **Manual Review** | 12% | 5% | 2% | Automation + confidence |
 | **False Positives** | 18% | 12% | 8% | Better signals |
 | **Dispute Win Rate** | 22% | 40% | 55% | Evidence capture |
-
-*Note: Approval rate, fraud rate, manual review, false positives, and dispute win rate are modeled projections, not measured in the MVP.*
 
 ### Financial Impact Model
 

@@ -157,7 +157,7 @@ Week 4-5: Gradual Ramp (25% → 50% → 100%)
 └── Full cutover only after 50% stable for 1 week
 ```
 
-### Safety Rails
+### Safety Rails (Target Design, Not Implemented in MVP)
 
 | Rail | Implementation | Trigger | Response |
 |------|----------------|---------|----------|
@@ -167,7 +167,7 @@ Week 4-5: Gradual Ramp (25% → 50% → 100%)
 | **Block rate guard** | Rolling metric | Rises >3% vs baseline | Alert Fraud Ops, investigate |
 | **Safe mode** | Fallback logic | Any critical failure | Configurable decision via `SAFE_MODE_DECISION` |
 
-Note: Automated breakers are not implemented in the MVP; safe mode is a manual toggle via `SAFE_MODE_ENABLED`.
+**Note:** Only safe mode is implemented in the MVP (manual toggle via `SAFE_MODE_ENABLED`). Automated breakers, rolling metrics, and auto-rollback are production deployment scope.
 
 ### Safe Mode Behavior
 
@@ -295,20 +295,4 @@ Severity 3 (Non-urgent):
 
 ---
 
-## Interview Application
-
-**When asked "How would you drive this as a Principal TPM?":**
-
-> "I'd start by mapping the stakeholder landscape - PSP integration, Security compliance, DS/ML model development, SRE reliability, Finance ROI, Product experience, and Fraud Ops usability. Each has different concerns that need to be balanced.
->
-> For execution, I'd sequence the rollout to minimize risk: shadow mode first to validate accuracy and latency without customer impact, then 5% traffic with kill switch ready, then gradual ramp with business sign-off at each gate.
->
-> The key decision frameworks center on three trade-offs: risk vs approval rate (expected value analysis), detection speed vs accuracy (latency budget), and automation vs manual review (confidence-based routing). I'd ensure these frameworks are documented and owned by the right stakeholders.
->
-> Safety rails are non-negotiable: latency breakers, error rate breakers, approval rate guards. Safe mode behavior is pre-defined so we degrade gracefully rather than fail catastrophically.
->
-> Communication is structured: daily standups for execution, weekly metrics reviews with business, monthly exec updates. Escalation paths are clear before we need them."
-
----
-
-*This document demonstrates Principal TPM execution thinking: stakeholder management, decision frameworks, risk-aware sequencing, and structured governance.*
+*This document covers cross-functional execution strategy: stakeholder management, decision frameworks, risk-aware sequencing, and structured governance.*

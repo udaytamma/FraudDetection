@@ -48,6 +48,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=str, default=str(ROOT / "models"))
     parser.add_argument("--min-rows", type=int, default=1000)
     parser.add_argument("--min-auc", type=float, default=0.85)
+    parser.add_argument("--validation-days", type=int, default=7)
     return parser.parse_args()
 
 
@@ -201,7 +202,7 @@ def main() -> None:
         logger.warning("No usable feature snapshots found")
         return
 
-    X_train, y_train, X_val, y_val = time_split(X, y, timestamps)
+    X_train, y_train, X_val, y_val = time_split(X, y, timestamps, validation_days=args.validation_days)
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

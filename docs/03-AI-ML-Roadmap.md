@@ -66,7 +66,7 @@ Phase 2 is implemented in-process and gated by `ML_ENABLED`. When disabled, the 
 | **Training Window** | 90-day window ending at label-maturity cutoff (default T-120d) |
 | **Retraining Frequency** | Weekly (automated pipeline) |
 | **Feature Count** | 25+ features |
-| **Target AUC** | >0.85 |
+| **Target AUC** | >0.85 (measured: XGBoost 0.909, LightGBM 0.913 on 5-fold CV with synthetic data) |
 | **Latency Budget** | <25ms P99 |
 
 #### Feature List
@@ -419,20 +419,6 @@ class EnsembleScoringService:
 | **Phase 2c** | ML in production | Implemented (gated by `ml_enabled`) | Week 4+ |
 | **Phase 2d** | Replay + drift + monitoring | Implemented (tooling + metrics) | Ongoing |
 | **Phase 3** | Advanced ML | Future | TBD |
-
----
-
-## Interview Application
-
-**When asked "What's the AI/ML roadmap?":**
-
-> "The MVP started rule-based to move fast with interpretable decisions, and Phase 2 is now implemented behind a feature flag. The system captures features in the evidence vault, includes a training pipeline, and supports champion/challenger routing via deterministic hashing. Replay tooling, drift detection, and model monitoring are implemented.
->
-> Phase 2 adds an XGBoost criminal-fraud model (with LightGBM as challenger) using 25+ features from velocity counters and entity profiles. Labels come from chargebacks with a 120-day maturity window. We deploy via champion/challenger routing by default (80% champion, 15% challenger, 5% holdout).
->
-> The ensemble approach remains: ML informs, but rules have hard overrides for signals like emulators or blocklist matches. This keeps the system interpretable for compliance while improving detection accuracy.
->
-> Retraining is weekly via the pipeline script (wrapped by `scripts/retrain.sh` with AUC gating), and promotion still requires 14 days of data and statistically significant improvement before we graduate a challenger to champion."
 
 ---
 

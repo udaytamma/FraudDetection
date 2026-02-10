@@ -30,15 +30,17 @@
 
 Component-level latency breakdown is **not captured** in this baseline run; only aggregate latencies are reported in the load test results file.
 
-### Capacity Projection
+### Capacity Projection (Extrapolated, Not Measured Beyond 50 Users)
 
 | Load Level | Est. RPS | Est. P99 | Bottleneck | Mitigation |
 |------------|----------|----------|------------|------------|
 | Baseline (50 users) | 260 | 106ms | None | - |
-| 2x (100 users) | 500 | 130ms | API workers | Add workers |
-| 4x (200 users) | 900 | 160ms | Redis connections | Connection pooling |
-| 8x (400 users) | 1,500 | 200ms | Redis throughput | Redis Cluster |
-| 16x+ (1000 users) | 3,000+ | >200ms | Architecture limit | Kafka + Flink |
+| 2x (100 users) | ~500 | ~130ms | API workers | Add workers |
+| 4x (200 users) | ~900 | ~160ms | Redis connections | Connection pooling |
+| 8x (400 users) | ~1,500 | ~200ms | Redis throughput | Redis Cluster |
+| 16x+ (1000 users) | ~3,000+ | >200ms | Architecture limit | Kafka + Flink |
+
+*Note: Only the Baseline row is measured. All other rows are linear extrapolations and would need load testing to validate.*
 
 ### Replay Validation (Implemented, Results Pending)
 
@@ -276,32 +278,6 @@ What This Doesn't Prove:
 | Drill-down | Limited | Yes - Click through to transaction |
 | Export | No | Yes - CSV/PDF for investigations |
 | Role-based access | No | Yes - Analyst vs Admin views |
-
----
-
-## Interview Application
-
-**When asked "How would you present results and limitations?":**
-
-> "I'd be transparent about what we've validated and what we haven't. The load test shows we hit 260 RPS at 106ms P99 on local infrastructure - that's 47% headroom to our 200ms SLA. But that's a single-node setup on synthetic data.
->
-> Key limitations: we haven't proven this works with real production traffic, real fraud patterns, or real chargebacks. The rule-based detection catches 72-94% of synthetic fraud depending on pattern type, but we need shadow deployment on real traffic to validate.
->
-> For dashboards, I'd map them to personas: Fraud Analysts need the review queue and case tools, Risk Leads need the KPI panels and threshold controls, SRE needs the latency and health panels with alert integration. The demo dashboard covers the Risk Lead use case; we'd need to build out the Analyst workflow for production.
->
-> The honest answer is: this proves the architecture works, but doesn't prove it works in production until we deploy it in shadow mode on real traffic."
-
-**When asked "What are the known gaps?":**
-
-> "Three categories: infrastructure, data, and operational.
->
-> Infrastructure: single-node everything, no auto-scaling, no multi-region. The path is clear - Kubernetes with HPA, Redis Cluster, PostgreSQL replicas - but it's not built yet.
->
-> Data: synthetic test data doesn't reflect real attack evolution. We need shadow deployment on production traffic and integration with real chargeback feeds to validate detection accuracy.
->
-> Operational: no analyst case management UI, no bulk operations, no real on-call runbooks. The demo dashboard shows the concept, but a Fraud Analyst can't do their job with it in production.
->
-> I'd present this honestly to stakeholders: MVP proves the concept, but there's a clear list of work before production readiness."
 
 ---
 

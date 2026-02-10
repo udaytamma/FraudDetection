@@ -4,11 +4,17 @@
 
 ## Project Overview
 
-**Purpose:** Real-time fraud detection system for payment transactions, designed for interview preparation (Principal TPM/Senior TPM at Mag7 companies) and potential implementation.
+**Purpose:** Real-time fraud detection system for payment transactions.
 
 **Status:** MVP implemented (FastAPI + Redis + Postgres). Target architecture is documented as a future phase.
 
 **Location:** `/Users/omega/Projects/FraudDetection`
+
+---
+
+## Capstone Scope & Intent
+
+This repository implements a **capstone MVP** that demonstrates end-to-end decisioning, evidence capture, and policy management with minimal infrastructure, plus Phase 2 ML scoring/training in-process behind a feature flag. The Kafka/Flink/Feast/OPA/Seldon stack described in the Target Architecture section remains a **target reference design** for scaled production, not a claim of current implementation here.
 
 ---
 
@@ -51,12 +57,6 @@ Implementation note: exactly-once decision responses are enforced via Redis + Po
 
 ---
 
-## Capstone Scope & Intent
-
-This repository implements a **capstone MVP** that demonstrates end‑to‑end decisioning, evidence capture, and policy management with minimal infrastructure, plus Phase 2 ML scoring/training in-process behind a feature flag. The Kafka/Flink/Feast/OPA/Seldon stack described below remains a **target reference design** for scaled production, not a claim of current implementation here.
-
----
-
 ## Technology Stack
 
 ### Current MVP (Implemented)
@@ -84,7 +84,9 @@ This repository implements a **capstone MVP** that demonstrates end‑to‑end d
 
 ---
 
-## Architecture Overview
+## Architecture Overview (Target Reference Design -- Not Implemented)
+
+> **This diagram shows the target production architecture, not the current MVP.** The MVP uses FastAPI + Redis + PostgreSQL directly. See "Current MVP (Implemented)" in the Technology Stack above for what is actually built.
 
 ```
                     ┌─────────────────────────────────────────────────────────┐
@@ -198,7 +200,7 @@ These are documented as accepted risks for capstone scope:
 
 - Default: 730 days (2 years) for chargeback dispute window
 - Configurable via `EVIDENCE_RETENTION_DAYS`
-- Purge script: `scripts/purge_evidence_vault.py`
+- Purge script: production deployment scope (not implemented in capstone)
 
 ### Production Gap: Key Rotation
 
@@ -417,20 +419,6 @@ Production recommendation: Use Celery or similar task queue with retry and DLQ.
 
 ---
 
-## Nebula Documentation
-
-Interview preparation materials in Cyrus:
-
-**Location:** `/Users/omega/Projects/Cyrus/src/app/nebula/fraud-detection-thinking/`
-
-**Each section contains:**
-1. Thinking Process - Systematic step-by-step derivation
-2. Decision Context - Specific choices and rationale
-3. Derivation Path - Visual flow of how to arrive at design
-4. Interview Application - 2-minute response template
-
----
-
 ## Key Design Principles
 
 1. **Constraints before solutions** - Enumerate non-negotiables first
@@ -497,12 +485,6 @@ Interview preparation materials in Cyrus:
 
 ---
 
-## Quick Reference
-
-**Master Prompt:** `/Users/omega/Projects/FraudDetection/PRDs/Master Prompt - Fraud Detection.txt`
-
-**Nebula Pages:** `/Users/omega/Projects/Cyrus/src/app/nebula/fraud-detection-thinking/`
-
 ---
 
-*Last Updated: February 08, 2026*
+*Last Updated: February 09, 2026*

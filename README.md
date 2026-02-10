@@ -2,6 +2,7 @@
 
 Real-time payment fraud detection for Telco/MSP payment processing. Velocity-based rules, configurable policy engine, and comprehensive observability.
 
+[![Tests](https://github.com/udaytamma/FraudDetection/actions/workflows/test.yml/badge.svg)](https://github.com/udaytamma/FraudDetection/actions/workflows/test.yml)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109-009688.svg)](https://fastapi.tiangolo.com)
 [![Redis](https://img.shields.io/badge/Redis-7.0-dc382d.svg)](https://redis.io)
@@ -403,7 +404,7 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 - Raw device IDs, IPs, and fingerprints are encrypted at rest
 - Primary evidence uses HMAC hashes for analytics without exposing raw values
-- Retention is enforced via manual purge script (`scripts/purge_evidence_vault.py`); schedule via cron or orchestrator in production
+- Retention enforcement (purge script) is a production deployment task; not implemented in the capstone MVP
 - This is a PCI-aware design, not a claim of PCI DSS certification
 
 ---
@@ -505,21 +506,9 @@ Defined but not yet populated in this codebase:
 - `fraud_component_health`
 - `fraud_policy_version`
 
-### Grafana Dashboard
+### Dashboard
 
-Import `grafana/fraud-overview.json` for pre-built visualizations (optional).
-
-Notes on panels that depend on metrics not populated in the current MVP (they will show empty/zero until instrumentation is added):
-- Approval Rate
-- Block Rate
-- Cache Hit/Miss Rate (misses are not emitted)
-- Component Latency (P99)
-- Criminal vs Friendly Fraud Scores (P95)
-- Detector Fire Rates (rate/5m)
-- Policy Engine Health
-- PostgreSQL Health
-- Redis Health
-- Risk Score Distribution
+The primary observability UI is the Streamlit dashboard (`dashboard.py`), which provides decision distribution, latency charts, decision history, policy inspection, and threshold management. A Grafana dashboard is not included in this repo; Prometheus metrics are available at `/metrics` for integration with external monitoring tools.
 
 ## Security Considerations
 
@@ -556,10 +545,10 @@ This is a capstone project demonstrating fraud detection architecture. The follo
 
 ## Roadmap
 
-- [x] ML model integration (XGBoost + LightGBM)
-- [x] Champion/challenger routing (deterministic)
+- [x] ML model integration (gated behind ML_ENABLED; training pipeline implemented)
+- [x] Champion/challenger routing (deterministic hash routing implemented)
+- [x] Replay framework (implemented via `scripts/replay_analysis.py`)
 - [ ] Automated retraining scheduler
-- [ ] Replay framework
 - [ ] Case management UI
 - [ ] Chargeback feedback loop
 

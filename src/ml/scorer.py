@@ -106,7 +106,7 @@ class MLScorer:
             import numpy as np
             vector_np = np.array(vector, dtype=float).reshape(1, -1)
             proba = model.predict(vector_np)
-            if isinstance(proba, (list, tuple)):
+            if hasattr(proba, '__len__') and len(proba) > 0:
                 return float(proba[0])
             return float(proba)
 

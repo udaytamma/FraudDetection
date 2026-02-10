@@ -127,7 +127,7 @@ Layer ML scoring while maintaining policy control (implemented behind `ML_ENABLE
 **Deliverables:**
 - XGBoost/LightGBM criminal fraud model (implemented)
 - Champion/challenger routing framework (implemented)
-- Historical replay for threshold simulation (planned)
+- Historical replay for threshold simulation (implemented via `scripts/replay_analysis.py`)
 - Economic optimization UI for business users
 - Automated chargeback + refund ingestion and labeling
 
@@ -182,7 +182,7 @@ Production hardening and expanded detection.
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
 | Redis failure | Low | High | Fallback to safe mode, cached features |
-| ML model drift | Medium | Medium | Weekly retraining, PSI monitoring |
+| ML model drift | Medium | Medium | Weekly retraining, PSI monitoring (module implemented; schedule external) |
 | Threshold misconfiguration | Medium | High | Replay testing, gradual rollout |
 | Attack pattern evolution | High | Medium | Champion/challenger experiments |
 | Integration delays | Medium | Medium | Shadow mode allows parallel testing |

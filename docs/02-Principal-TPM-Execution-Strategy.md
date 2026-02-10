@@ -75,7 +75,7 @@ This framework is the economic target state; the MVP currently applies score thr
 - Fraud Ops can adjust within guard rails without engineering
 - Changes require replay testing before production
 
-Note: Replay tooling is not implemented in this repo; this is a planned production process.
+Note: Replay tooling is implemented in `scripts/replay_analysis.py`; scheduling/automation is left to the deploy environment.
 
 ### Trade-off 2: Detection Speed vs. Accuracy
 

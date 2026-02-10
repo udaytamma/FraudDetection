@@ -47,6 +47,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--registry-path", type=str, default=str(ROOT / "models" / "registry.json"))
     parser.add_argument("--output-dir", type=str, default=str(ROOT / "models"))
     parser.add_argument("--min-rows", type=int, default=1000)
+    parser.add_argument("--min-auc", type=float, default=0.85)
     return parser.parse_args()
 
 
@@ -229,6 +230,8 @@ def main() -> None:
                 window_end=end.isoformat(),
             ),
         )
+        if xgb_auc is not None and xgb_auc < args.min_auc:
+            logger.warning("Champion AUC %.4f below min %.4f (registered anyway)", xgb_auc, args.min_auc)
         logger.info("Saved champion model: %s (AUC=%s)", xgb_version, xgb_auc)
     except Exception as exc:
         logger.warning("XGBoost training failed: %s", exc)
@@ -240,26 +243,30 @@ def main() -> None:
         lgb_path = output_dir / f"{lgb_version}.txt"
         lgb_model.booster_.save_model(str(lgb_path))
 
-        registry.set(
-            "challenger",
-            ModelEntry(
-                name="lightgbm_criminal",
-                version=lgb_version,
-                path=str(lgb_path),
-                framework="lightgbm",
-                model_type="lgbm_classifier",
-                trained_at=trained_at,
-                auc=lgb_auc,
-                feature_columns=FEATURE_COLUMNS,
-                window_start=start.isoformat(),
-                window_end=end.isoformat(),
-            ),
-        )
-        logger.info("Saved challenger model: %s (AUC=%s)", lgb_version, lgb_auc)
+        if lgb_auc is None:
+            logger.warning("No validation AUC for challenger; skipping registry update")
+        elif lgb_auc < args.min_auc:
+            logger.warning("Challenger AUC %.4f below min %.4f; skipping registry update", lgb_auc, args.min_auc)
+        else:
+            registry.set(
+                "challenger",
+                ModelEntry(
+                    name="lightgbm_criminal",
+                    version=lgb_version,
+                    path=str(lgb_path),
+                    framework="lightgbm",
+                    model_type="lgbm_classifier",
+                    trained_at=trained_at,
+                    auc=lgb_auc,
+                    feature_columns=FEATURE_COLUMNS,
+                    window_start=start.isoformat(),
+                    window_end=end.isoformat(),
+                ),
+            )
+            logger.info("Saved challenger model: %s (AUC=%s)", lgb_version, lgb_auc)
     except Exception as exc:
         logger.warning("LightGBM training failed: %s", exc)
 
 
 if __name__ == "__main__":
     main()
-

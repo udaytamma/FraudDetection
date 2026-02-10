@@ -40,9 +40,10 @@ Component-level latency breakdown is **not captured** in this baseline run; only
 | 8x (400 users) | 1,500 | 200ms | Redis throughput | Redis Cluster |
 | 16x+ (1000 users) | 3,000+ | >200ms | Architecture limit | Kafka + Flink |
 
-### Replay Validation (Not Implemented in MVP)
+### Replay Validation (Implemented, Results Pending)
 
-The current MVP in this repo does not include a historical replay pipeline, and no replay artifacts are checked in. This section is reserved for future results once a replay tool is implemented.
+Historical replay is implemented via `src/ml/replay.py` and the CLI wrapper `scripts/replay_analysis.py`.
+No replay artifacts are checked into the repo yet; this section will be populated once replay runs are archived.
 
 ---
 
@@ -77,7 +78,7 @@ The current MVP in this repo does not include a historical replay pipeline, and 
 | **No adaptive thresholds** | Static rules don't evolve | Implement threshold optimization |
 | **No feedback loop** | Decisions don't improve system | Add analyst feedback to training |
 | **No automated promotion** | Manual model governance | Add promotion automation + guardrails |
-| **No drift detection** | Model may degrade silently | Implement PSI monitoring |
+| **No automated drift monitoring** | Model may degrade silently | Schedule PSI checks and alerting |
 
 ### Operational Limitations
 
@@ -183,7 +184,7 @@ What This Doesn't Prove:
    └── Threshold performance
 
 3. Threshold Adjustment:
-   └── Run replay simulation on proposed change (planned; not in MVP)
+   └── Run replay simulation on proposed change (`scripts/replay_analysis.py`)
    └── Review projected impact
    └── If acceptable: Apply via Policy Settings
    └── Monitor for 48h post-change

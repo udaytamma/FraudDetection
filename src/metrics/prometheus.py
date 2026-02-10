@@ -190,6 +190,39 @@ class FraudMetrics:
             labelnames=["variant", "version"],
         )
 
+        # =====================================================================
+        # ML Monitoring Metrics
+        # =====================================================================
+        self.model_decisions_total = Counter(
+            "fraud_model_decisions_total",
+            "ML decision counts by variant and outcome",
+            labelnames=["variant", "decision"],
+        )
+
+        self.model_fallback_total = Counter(
+            "fraud_model_fallback_total",
+            "ML scoring fallbacks by variant",
+            labelnames=["variant"],
+        )
+
+        self.model_approval_rate = Gauge(
+            "fraud_model_approval_rate",
+            "Approval rate by model variant",
+            labelnames=["variant"],
+        )
+
+        self.model_fraud_rate = Gauge(
+            "fraud_model_fraud_rate",
+            "Fraud rate by model variant",
+            labelnames=["variant"],
+        )
+
+        self.model_fallback_rate = Gauge(
+            "fraud_model_fallback_rate",
+            "Fallback rate by model variant",
+            labelnames=["variant"],
+        )
+
 
 # Global metrics instance
 metrics = FraudMetrics()

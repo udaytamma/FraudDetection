@@ -405,6 +405,9 @@ Production recommendation: Use Celery or similar task queue with retry and DLQ.
 - Economic optimization UI
 - Champion/challenger routing (implemented; gated by `ml_enabled`)
 - Model retraining pipeline (implemented via `scripts/train_model.py`)
+- Replay tooling for historical validation (implemented via `src/ml/replay.py` + `scripts/replay_analysis.py`)
+- Drift detection (PSI module implemented; scheduling external)
+- Model monitoring helpers + Prometheus metrics (implemented via `src/ml/monitoring.py`)
 
 ### Phase 3: Extended Detection
 

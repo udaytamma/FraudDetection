@@ -39,6 +39,7 @@ from ..policy import (
 )
 from ..evidence import EvidenceService
 from ..metrics import metrics, setup_metrics, telemetry
+from ..ml import ModelMonitor
 from .dependencies import get_redis, get_db_pool
 from .auth import require_api_token, require_admin_token, require_metrics_token
 
@@ -50,6 +51,9 @@ risk_scorer: Optional[RiskScorer] = None
 policy_engine: Optional[PolicyEngine] = None
 evidence_service: Optional[EvidenceService] = None
 policy_versioning: Optional[PolicyVersioningService] = None
+model_monitor: Optional[ModelMonitor] = None
+
+CRIMINAL_REASON_CODES = {"10.1", "10.2", "10.3", "10.4", "10.5"}
 
 
 @asynccontextmanager
@@ -62,7 +66,7 @@ async def lifespan(app: FastAPI):
     - Database pool
     - Service instances
     """
-    global redis_client, feature_store, risk_scorer, policy_engine, evidence_service, policy_versioning
+    global redis_client, feature_store, risk_scorer, policy_engine, evidence_service, policy_versioning, model_monitor
 
     # Initialize Redis
     redis_client = redis.Redis(
@@ -83,6 +87,7 @@ async def lifespan(app: FastAPI):
     # Initialize services
     feature_store = FeatureStore(redis_client)
     risk_scorer = RiskScorer()
+    model_monitor = ModelMonitor(metrics_enabled=settings.metrics_enabled)
 
     # Load policy from file if exists
     policy_path = Path(__file__).parent.parent.parent / "config" / "policy.yaml"
@@ -227,6 +232,8 @@ async def make_decision(
             metrics.decisions_total.labels(decision=response.decision.value).inc()
             metrics.e2e_latency.observe(safe_time)
             telemetry.record(response.decision.value, safe_time)
+            if model_monitor:
+                model_monitor.record_decision(response.decision, response.scores)
 
             # Capture evidence for auditability (zeroed scores, no computed features)
             safe_features = FeatureSet()
@@ -336,6 +343,8 @@ async def make_decision(
         metrics.decisions_total.labels(decision=decision.value).inc()
         metrics.e2e_latency.observe(total_time)
         telemetry.record(decision.value, total_time)
+        if model_monitor:
+            model_monitor.record_decision(decision, scores)
 
         # Log slow requests
         if total_time > settings.target_e2e_latency_ms:
@@ -831,6 +840,9 @@ async def ingest_chargeback(
             ),
             "update_chargeback_profiles",
         )
+        if model_monitor:
+            is_fraud = chargeback.fraud_type == "CRIMINAL" or chargeback.reason_code in CRIMINAL_REASON_CODES
+            model_monitor.record_outcome(evidence.get("model_variant"), is_fraud)
 
     return {
         "status": "success",

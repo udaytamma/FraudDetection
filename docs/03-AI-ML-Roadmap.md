@@ -139,8 +139,8 @@ Weekly Pipeline (Automated):
 3. Retrieve point-in-time features from evidence vault
 4. Train new model version
 5. Validate against holdout (last 7 days of the window)
-6. If AUC drop < 2%: Register as challenger (or keep champion)
-7. If AUC drop >= 2%: Alert DS team, use previous model
+6. If AUC >= min threshold (default 0.85): Register as challenger
+7. If AUC < threshold: Skip registration and alert for investigation
 
 Monthly Review (Manual):
 1. Compare champion vs challenger performance
@@ -202,7 +202,7 @@ Rollback Challenger if ANY true:
 
 ### Replay Framework
 
-Status: Planned; not implemented in this repo.
+Status: Implemented (see `src/ml/replay.py` and `scripts/replay_analysis.py`).
 
 #### Purpose
 
@@ -213,46 +213,15 @@ Historical replay enables:
 
 #### Implementation
 
-```python
-async def replay(
-    start_date: datetime,
-    end_date: datetime,
-    policy_config: Optional[dict] = None,
-    model_version: Optional[str] = None
-) -> ReplayResults:
-    """
-    Replay historical transactions with optional config changes.
+Replay tooling reads point-in-time feature snapshots from `transaction_evidence`
+and rescoring is performed with a supplied model + threshold. The CLI wrapper
+returns deltas for approval rate, fraud caught, and false positives.
 
-    Key: Uses point-in-time features from evidence vault,
-    NOT current features (which would cause look-ahead bias).
-    """
-
-    for transaction in get_historical_transactions(start_date, end_date):
-        # Get features AS THEY WERE at transaction time
-        features = get_features_at_time(
-            transaction.auth_id,
-            transaction.timestamp
-        )
-
-        # Score with specified model/policy
-        new_decision = score_and_decide(
-            transaction,
-            features,
-            model_version,
-            policy_config
-        )
-
-        # Compare to actual outcome
-        actual_fraud = was_transaction_fraud(transaction.auth_id)
-
-        # Record for analysis
-        results.append({
-            "original_decision": transaction.original_decision,
-            "new_decision": new_decision,
-            "actual_fraud": actual_fraud
-        })
-
-    return analyze_results(results)
+```
+python scripts/replay_analysis.py \\
+  --start 2025-09-01 --end 2025-10-01 \\
+  --model-path models/xgb-20260101.json --model-type xgb_classifier \\
+  --threshold 0.7
 ```
 
 #### Simulation Use Cases
@@ -263,6 +232,38 @@ async def replay(
 | Model comparison | Model version A vs B | AUC difference, FP rate difference |
 | Rule addition | New rule definition | Transactions affected, score changes |
 | Seasonal analysis | Date range comparison | Pattern differences by period |
+
+---
+
+## Drift Detection (Implemented)
+
+Drift detection is implemented via **Population Stability Index (PSI)** in `src/ml/drift.py`.
+The module compares a training baseline window to a current window and flags features with
+`PSI > 0.2` as significant drift.
+
+Typical usage pattern:
+- Baseline: training window used for champion model
+- Current: most recent 7 days of traffic
+- Output: per-feature PSI scores + list of drifted features
+
+---
+
+## Model Monitoring (Implemented)
+
+The ML monitoring helper in `src/ml/monitoring.py` tracks:
+- **Per-variant decision rates** (champion/challenger/holdout/rules-only)
+- **Fallback rate** (ML unavailable → rules-only)
+- **Fraud + approval rates per variant** (fraud rate lags by chargeback arrival)
+
+Metrics are exported via Prometheus (see README metrics list).
+
+---
+
+## Retraining Automation (Implemented)
+
+`scripts/retrain.sh` wraps `scripts/train_model.py` and enforces a minimum AUC
+before registering a challenger. This supports weekly cron execution without
+hand-editing the pipeline.
 
 ---
 
@@ -416,6 +417,7 @@ class EnsembleScoringService:
 | **Phase 2a** | ML model training | Implemented (manual run) | Weeks 1-2 |
 | **Phase 2b** | Champion/challenger | Implemented (routing + registry) | Weeks 2-3 |
 | **Phase 2c** | ML in production | Implemented (gated by `ml_enabled`) | Week 4+ |
+| **Phase 2d** | Replay + drift + monitoring | Implemented (tooling + metrics) | Ongoing |
 | **Phase 3** | Advanced ML | Future | TBD |
 
 ---
@@ -424,14 +426,14 @@ class EnsembleScoringService:
 
 **When asked "What's the AI/ML roadmap?":**
 
-> "The MVP started rule-based to move fast with interpretable decisions, and Phase 2 is now implemented behind a feature flag. The system captures features in the evidence vault, includes a training pipeline, and supports champion/challenger routing via deterministic hashing. Replay tooling is still planned.
+> "The MVP started rule-based to move fast with interpretable decisions, and Phase 2 is now implemented behind a feature flag. The system captures features in the evidence vault, includes a training pipeline, and supports champion/challenger routing via deterministic hashing. Replay tooling, drift detection, and model monitoring are implemented.
 >
 > Phase 2 adds an XGBoost criminal-fraud model (with LightGBM as challenger) using 25+ features from velocity counters and entity profiles. Labels come from chargebacks with a 120-day maturity window. We deploy via champion/challenger routing by default (80% champion, 15% challenger, 5% holdout).
 >
 > The ensemble approach remains: ML informs, but rules have hard overrides for signals like emulators or blocklist matches. This keeps the system interpretable for compliance while improving detection accuracy.
 >
-> Retraining is weekly via the pipeline script, and promotion still requires 14 days of data and statistically significant improvement before we graduate a challenger to champion."
+> Retraining is weekly via the pipeline script (wrapped by `scripts/retrain.sh` with AUC gating), and promotion still requires 14 days of data and statistically significant improvement before we graduate a challenger to champion."
 
 ---
 
-*This document consolidates the AI/ML strategy with explicit current status, including what is implemented and what remains planned (replay tooling, automated scheduling).* 
+*This document consolidates the AI/ML strategy with explicit current status, including what is implemented and what remains planned (automated scheduling/cron).* 

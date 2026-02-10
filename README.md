@@ -242,10 +242,10 @@ Content-Type: application/json
 | POST | `/policy/rules` | ADMIN_TOKEN | Add policy rule |
 | PUT | `/policy/rules/{rule_id}` | ADMIN_TOKEN | Update policy rule |
 | DELETE | `/policy/rules/{rule_id}` | ADMIN_TOKEN | Delete policy rule |
-| POST | `/policy/lists/{list_type}` | None | Add to blocklist/allowlist |
-| DELETE | `/policy/lists/{list_type}/{value}` | None | Remove from list |
-| POST | `/policy/rollback/{target_version}` | None | Rollback to previous version |
-| GET | `/policy/diff/{version1}/{version2}` | None | Compare two policy versions |
+| POST | `/policy/lists/{list_type}` | ADMIN_TOKEN | Add to blocklist/allowlist |
+| DELETE | `/policy/lists/{list_type}/{value}` | ADMIN_TOKEN | Remove from list |
+| POST | `/policy/rollback/{target_version}` | ADMIN_TOKEN | Rollback to previous version |
+| GET | `/policy/diff/{version1}/{version2}` | API_TOKEN | Compare two policy versions |
 
 ## Project Structure
 
@@ -269,13 +269,17 @@ FraudDetection/
 │   │   ├── velocity.py         # Velocity rules
 │   │   ├── geo.py              # Geographic anomaly checks
 │   │   ├── bot.py              # Bot/emulator detection
+│   │   ├── friendly_fraud.py   # Friendly fraud detector
 │   │   └── detector.py         # Detection engine orchestration
 │   ├── scoring/                # Risk scoring
 │   │   ├── risk_scorer.py      # Risk score aggregation
 │   │   └── friendly_fraud.py   # Friendly fraud scoring
 │   ├── ml/                     # ML scoring + features (Phase 2)
 │   │   ├── features.py         # Feature vectorization
+│   │   ├── drift.py            # PSI drift detection
+│   │   ├── monitoring.py       # Model monitoring helpers
 │   │   ├── registry.py         # Model registry
+│   │   ├── replay.py           # Offline replay framework
 │   │   └── scorer.py           # ML scorer + routing
 │   ├── policy/                 # Policy engine
 │   │   └── engine.py           # Rule evaluation
@@ -288,6 +292,9 @@ FraudDetection/
 │   └── prometheus.yml          # Prometheus config
 ├── scripts/
 │   ├── init_db.sql             # Database schema
+│   ├── replay_analysis.py      # Offline replay CLI
+│   ├── retrain.sh              # Weekly retrain wrapper
+│   ├── seed_synthetic.py       # Synthetic data seeding
 │   └── train_model.py          # Phase 2 training pipeline
 ├── tests/                      # Test suite
 ├── dashboard.py                # Streamlit dashboard
@@ -358,6 +365,9 @@ rules:
 
 **ML scoring note:**
 - Run `scripts/train_model.py` to populate `models/registry.json` (champion/challenger).
+- Run `scripts/replay_analysis.py` to simulate threshold/model changes on historical evidence.
+- Use `scripts/retrain.sh` for the weekly retrain wrapper with AUC gating.
+  - Override the gate via `MIN_AUC=0.87` or pass `--min-auc` through.
 - Set `ML_ENABLED=true` to activate ML scoring in the API.
 
 ## Evidence Vault
@@ -477,6 +487,11 @@ Emitted in the current MVP:
 - `fraud_cache_hits_total` - Idempotency cache hits
 - `fraud_postgres_latency_ms` - Postgres operation latency (evidence + idempotency)
 - `fraud_model_version_info` - Model version by variant (when ML enabled)
+- `fraud_model_decisions_total` - ML decisions by variant + outcome
+- `fraud_model_fallback_total` - ML fallback counts (rules-only)
+- `fraud_model_approval_rate` - Approval rate by model variant
+- `fraud_model_fraud_rate` - Fraud rate by model variant (lagged by chargebacks)
+- `fraud_model_fallback_rate` - Fallback rate by model variant
 
 Defined but not yet populated in this codebase:
 - `fraud_cache_misses_total`

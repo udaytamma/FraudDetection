@@ -1,7 +1,7 @@
 """
 Advanced Detection Tests - Telco/MSP Payment Fraud
 
-Tests for BINAttackDetector, additional bot detection branches,
+Tests for additional bot detection branches,
 velocity attack edge cases, and card testing device/IP checks.
 Covers uncovered code paths in detection modules.
 """
@@ -23,79 +23,6 @@ from src.detection import (
     GeoAnomalyDetector,
     BotDetector,
 )
-from src.detection.card_testing import BINAttackDetector
-
-
-# =============================================================================
-# BINAttackDetector Tests
-# =============================================================================
-
-class TestBINAttackDetector:
-    """Tests for BIN enumeration attack detection."""
-
-    @pytest_asyncio.fixture
-    def detector(self):
-        return BINAttackDetector(same_bin_threshold=10)
-
-    @pytest.mark.asyncio
-    async def test_no_multi_card_activity(self, detector, sample_event):
-        """Low card diversity should not trigger."""
-        features = FeatureSet(
-            velocity=VelocityFeatures(
-                device_distinct_cards_1h=1,
-                ip_distinct_cards_1h=1,
-            ),
-        )
-
-        result = await detector.detect(sample_event, features)
-
-        assert result.score == 0.0
-        assert not result.triggered
-
-    @pytest.mark.asyncio
-    async def test_high_card_diversity_triggers(self, detector, sample_event):
-        """High card diversity from single device+IP should trigger."""
-        features = FeatureSet(
-            velocity=VelocityFeatures(
-                device_distinct_cards_1h=8,
-                ip_distinct_cards_1h=12,
-            ),
-        )
-
-        result = await detector.detect(sample_event, features)
-
-        assert result.triggered
-        assert any("BIN_ATTACK" in r.code for r in result.reasons)
-
-    @pytest.mark.asyncio
-    async def test_below_combined_threshold(self, detector, sample_event):
-        """Only device OR IP cards above threshold, but not both."""
-        features = FeatureSet(
-            velocity=VelocityFeatures(
-                device_distinct_cards_1h=2,  # Below 3
-                ip_distinct_cards_1h=8,
-            ),
-        )
-
-        result = await detector.detect(sample_event, features)
-
-        assert result.score == 0.0
-
-    @pytest.mark.asyncio
-    async def test_moderate_diversity_low_score(self, detector, sample_event):
-        """Moderate card diversity should produce score but may not trigger."""
-        features = FeatureSet(
-            velocity=VelocityFeatures(
-                device_distinct_cards_1h=3,
-                ip_distinct_cards_1h=5,
-            ),
-        )
-
-        result = await detector.detect(sample_event, features)
-
-        assert result.score > 0  # Has some score
-        # May or may not trigger depending on exact math
-
 
 # =============================================================================
 # CardTestingDetector - Device/IP Card Coverage

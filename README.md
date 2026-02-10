@@ -286,8 +286,10 @@ FraudDetection/
 │   │   └── engine.py           # Rule evaluation
 │   ├── evidence/               # Evidence capture
 │   │   └── service.py          # Evidence service
-│   └── metrics/                # Observability
-│       └── prometheus.py       # Metric definitions
+│   ├── metrics/                # Observability
+│   │   └── prometheus.py       # Metric definitions
+│   └── utils/                  # Logging utilities
+│       └── logger.py           # Structured logging
 ├── config/
 │   ├── policy.yaml             # Policy configuration
 │   └── prometheus.yml          # Prometheus config
@@ -343,6 +345,16 @@ rules:
     action: FRICTION
     friction_type: 3DS
 ```
+
+### Policy Architecture
+
+The platform uses a two-tier policy system:
+
+- **Production Policy** (`config/policy.yaml`): 6 rules with tuned thresholds, hot-reloadable without restart
+- **Fallback Policy** (`src/policy/rules.py` DEFAULT_POLICY): 3 rules with conservative thresholds, compiled into the application
+- **Hot Reload**: `POST /policy/reload` reloads the YAML policy without restarting the API
+
+The fallback policy activates when the YAML file is missing or invalid, ensuring the system remains operational with conservative defaults. The fallback uses higher block thresholds and fewer rules to minimize false positives.
 
 ### Environment Variables
 
@@ -404,8 +416,67 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 - Raw device IDs, IPs, and fingerprints are encrypted at rest
 - Primary evidence uses HMAC hashes for analytics without exposing raw values
-- Retention enforcement (purge script) is a production deployment task; not implemented in the capstone MVP
+- Retention enforcement via `scripts/purge_evidence_vault.py` (run as a scheduled task in production)
 - This is a PCI-aware design, not a claim of PCI DSS certification
+
+### Evidence Retention
+
+Evidence records are purged after the retention period expires (default 730 days). Run the purge script as a scheduled task:
+
+```bash
+python scripts/purge_evidence_vault.py
+```
+
+---
+
+## Policy Management API
+
+Dynamic policy configuration without deployment. All mutation endpoints require admin token.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/policy` | GET | View current policy |
+| `/policy/version` | GET | Current policy version |
+| `/policy/reload` | POST | Hot-reload policy from YAML |
+| `/policy/versions` | GET | List all policy versions |
+| `/policy/versions/{version}` | GET | Get specific version |
+| `/policy/thresholds` | PUT | Update score thresholds |
+| `/policy/rules` | POST | Add new detection rule |
+| `/policy/rules/{rule_id}` | PUT | Update existing rule |
+| `/policy/rules/{rule_id}` | DELETE | Delete rule |
+| `/policy/lists/{list_type}` | POST | Add to blocklist/allowlist |
+| `/policy/lists/{list_type}/{value}` | DELETE | Remove from list |
+| `/policy/rollback/{target_version}` | POST | Rollback to previous version |
+| `/policy/diff/{version1}/{version2}` | GET | Compare two versions |
+
+## Data Pipeline
+
+### Chargeback and Refund Ingestion
+
+Ground truth labels for ML training and evidence enrichment:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/chargebacks` | POST | Ingest chargeback (marks transaction as confirmed fraud) |
+| `/refunds` | POST | Ingest refund (friendly fraud signal) |
+
+These endpoints update evidence vault records with outcome labels used by the ML training pipeline.
+
+### Synthetic Data Seeding
+
+Generate test transactions for development and ML training:
+
+```bash
+# Generate synthetic transactions via the API
+python scripts/seed_synthetic.py \
+  --count 1000 --fraud-ratio 0.15 \
+  --api-url http://localhost:8000
+
+# Backdate for historical training data
+python scripts/seed_synthetic.py \
+  --count 5000 --backdate-captured-at \
+  --postgres-url postgresql://user:pass@localhost/fraud
+```
 
 ---
 

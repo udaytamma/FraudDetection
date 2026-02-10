@@ -4,6 +4,11 @@ Telco/MSP Payment Fraud Detection Platform - Demo Dashboard
 Professional-grade Streamlit dashboard for demonstrating and testing
 the fraud detection system for Telco/MSP payment fraud.
 
+Note: This dashboard uses raw asyncpg for direct read-only analytics queries
+to PostgreSQL, rather than SQLAlchemy. This is intentional -- the dashboard is a
+standalone visualization tool, not a transactional application, so the simpler
+asyncpg interface is appropriate for read-only aggregate queries.
+
 Supports:
 - Mobile: SIM activation, topup, device upgrade, SIM swap, international enable
 - Broadband: Service activation, equipment swap, speed upgrade, equipment purchase

@@ -190,7 +190,19 @@ class PolicyRules(BaseModel):
         )
 
 
-# Default policy configuration
+# Default policy configuration (fallback)
+# ========================================
+# This DEFAULT_POLICY serves as the fallback when config/policy.yaml is missing
+# or fails to load. It provides minimal, conservative defaults to keep the system
+# operational during degraded configuration state.
+#
+# The deployed policy is in config/policy.yaml, which has additional rules
+# (e.g., tor_block, datacenter_review, rooted_high_value) and tuned thresholds.
+# The YAML policy is loaded at startup and can be hot-reloaded via POST /policy/reload.
+#
+# DEFAULT_POLICY thresholds are intentionally more conservative (higher block
+# thresholds, fewer rules) to minimize false positives when running without
+# the full production policy configuration.
 DEFAULT_POLICY = PolicyRules(
     version="1.0.0",
     description="Default fraud detection policy",

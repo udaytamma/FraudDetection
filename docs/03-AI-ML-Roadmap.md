@@ -63,9 +63,9 @@ Phase 2 is implemented in-process and gated by `ML_ENABLED`. When disabled, the 
 |-----------|---------------|
 | **Algorithm** | XGBoost (primary), LightGBM (challenger) |
 | **Objective** | Binary classification (is_criminal_fraud) |
-| **Training Window** | 90-day window ending at label-maturity cutoff (default T-120d) |
+| **Training Window** | Configurable window (default 90d; current model trained on 365d for broader coverage) ending at label-maturity cutoff (default T-120d) |
 | **Retraining Frequency** | Weekly (automated pipeline) |
-| **Feature Count** | 25+ features |
+| **Feature Count** | 28 features (see feature list below) |
 | **Target AUC** | >0.85 (measured: XGBoost 0.909, LightGBM 0.913 on 5-fold CV with synthetic data) |
 | **Latency Budget** | <25ms P99 |
 
@@ -139,8 +139,10 @@ Weekly Pipeline (Automated):
 3. Retrieve point-in-time features from evidence vault
 4. Train new model version
 5. Validate against holdout (last 7 days of the window)
-6. If AUC >= min threshold (default 0.85): Register as challenger
-7. If AUC < threshold: Skip registration and alert for investigation
+6. If AUC >= min threshold (default 0.85): Register as challenger with success log
+7. If AUC < threshold (champion only): Register with warning log -- system requires a champion model to function; skipping would break scoring
+
+**Design rationale:** The fraud detection API must always have a callable model. Blocking champion registration on low AUC would leave the system without a scorer. Instead, below-threshold champions are registered with a warning, and the operations team investigates via the monitoring pipeline. The challenger path correctly enforces the minimum AUC gate.
 
 Monthly Review (Manual):
 1. Compare champion vs challenger performance
@@ -368,6 +370,8 @@ Implementation:
 ```
 
 ### Ensemble Scoring
+
+> **Note:** This pseudocode shows the conceptual Phase 2 ensemble design. The current implementation uses `RiskScorer.compute_scores()` in `src/scoring/risk_scorer.py`, which applies a simpler weighted-max approach. The ensemble architecture below represents the target design when ML scoring is fully promoted.
 
 ```python
 class EnsembleScoringService:

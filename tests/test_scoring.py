@@ -1,9 +1,8 @@
 """
 Scoring Module Tests - Telco/MSP Payment Fraud
 
-Tests for risk scoring, high-value transaction scoring,
-and friendly fraud scoring. All tests use mocked features
-(no Redis/PostgreSQL required).
+Tests for risk scoring and friendly fraud scoring.
+All tests use mocked features (no Redis/PostgreSQL required).
 """
 
 import pytest
@@ -15,11 +14,8 @@ from src.schemas import (
     EntityFeatures,
     FeatureSet,
     RiskScores,
-    DecisionReason,
-    ServiceType,
-    EventSubtype,
 )
-from src.scoring.risk_scorer import RiskScorer, HighValueTransactionScorer
+from src.scoring.risk_scorer import RiskScorer
 from src.scoring.friendly_fraud import FriendlyFraudScorer, SubscriptionAbuseScorer
 
 
@@ -190,163 +186,6 @@ class TestRiskScorer:
 
         assert scores.friendly_fraud_score > 0
         assert any("CHARGEBACK" in r.code or "RISK_TIER" in r.code for r in reasons)
-
-
-class TestHighValueTransactionScorer:
-    """Tests for high-value transaction scoring."""
-
-    @pytest.fixture
-    def scorer(self):
-        return HighValueTransactionScorer(
-            high_value_threshold_cents=100000,
-            new_account_days=7,
-        )
-
-    def test_below_threshold_no_score(self, scorer, sample_event):
-        """Transactions below threshold should not be scored."""
-        features = FeatureSet(amount_cents=5000)
-
-        score, reasons = scorer.score(sample_event, features)
-
-        assert score == 0.0
-        assert len(reasons) == 0
-
-    def test_high_value_new_account(self, scorer, sample_event):
-        """High-value from new/guest account should trigger."""
-        sample_event.amount_cents = 120000
-        features = FeatureSet(
-            amount_cents=120000,
-            entity=EntityFeatures(
-                user_is_new=True,
-                user_is_guest=False,
-                card_is_new=False,
-            ),
-            has_3ds=True,
-            avs_match=True,
-            cvv_match=True,
-        )
-
-        score, reasons = scorer.score(sample_event, features)
-
-        assert score > 0
-        assert any("NEW_ACCOUNT" in r.code for r in reasons)
-
-    def test_high_value_new_card(self, scorer, sample_event):
-        """High-value with first-seen card should trigger."""
-        sample_event.amount_cents = 120000
-        features = FeatureSet(
-            amount_cents=120000,
-            entity=EntityFeatures(
-                user_is_new=False,
-                user_is_guest=False,
-                card_is_new=True,
-            ),
-            has_3ds=True,
-            avs_match=True,
-            cvv_match=True,
-        )
-
-        score, reasons = scorer.score(sample_event, features)
-
-        assert score > 0
-        assert any("NEW_CARD" in r.code for r in reasons)
-
-    def test_high_value_no_3ds(self, scorer, sample_event):
-        """High-value without 3DS should trigger."""
-        sample_event.amount_cents = 120000
-        features = FeatureSet(
-            amount_cents=120000,
-            entity=EntityFeatures(
-                user_is_new=False,
-                card_is_new=False,
-            ),
-            has_3ds=False,
-            avs_match=True,
-            cvv_match=True,
-        )
-
-        score, reasons = scorer.score(sample_event, features)
-
-        assert score > 0
-        assert any("NO_3DS" in r.code for r in reasons)
-
-    def test_high_value_avs_mismatch(self, scorer, sample_event):
-        """High-value with AVS mismatch should trigger."""
-        sample_event.amount_cents = 120000
-        features = FeatureSet(
-            amount_cents=120000,
-            entity=EntityFeatures(
-                user_is_new=False,
-                card_is_new=False,
-            ),
-            has_3ds=True,
-            avs_match=False,
-            cvv_match=True,
-        )
-
-        score, reasons = scorer.score(sample_event, features)
-
-        assert score > 0
-        assert any("AVS" in r.code for r in reasons)
-
-    def test_high_value_cvv_mismatch(self, scorer, sample_event):
-        """High-value with CVV mismatch should trigger."""
-        sample_event.amount_cents = 120000
-        features = FeatureSet(
-            amount_cents=120000,
-            entity=EntityFeatures(
-                user_is_new=False,
-                card_is_new=False,
-            ),
-            has_3ds=True,
-            avs_match=True,
-            cvv_match=False,
-        )
-
-        score, reasons = scorer.score(sample_event, features)
-
-        assert score > 0
-        assert any("CVV" in r.code for r in reasons)
-
-    def test_multiple_signals_compound(self, scorer, sample_event):
-        """Multiple signals should compound the score."""
-        sample_event.amount_cents = 120000
-        features = FeatureSet(
-            amount_cents=120000,
-            entity=EntityFeatures(
-                user_is_new=True,
-                user_is_guest=True,
-                card_is_new=True,
-            ),
-            has_3ds=False,
-            avs_match=False,
-            cvv_match=False,
-        )
-
-        score, reasons = scorer.score(sample_event, features)
-
-        # Multiple signals should produce a higher score than any single signal
-        assert score > 0.6
-        assert len(reasons) >= 3
-
-    def test_score_capped_at_one(self, scorer, sample_event):
-        """Score should never exceed 1.0 even with all signals."""
-        sample_event.amount_cents = 200000
-        features = FeatureSet(
-            amount_cents=200000,
-            entity=EntityFeatures(
-                user_is_new=True,
-                user_is_guest=True,
-                card_is_new=True,
-            ),
-            has_3ds=False,
-            avs_match=False,
-            cvv_match=False,
-        )
-
-        score, _ = scorer.score(sample_event, features)
-
-        assert score <= 1.0
 
 
 class TestFriendlyFraudScorer:

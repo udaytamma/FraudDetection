@@ -24,7 +24,7 @@ scrape_configs:
   # Fraud Detection API metrics
   - job_name: 'fraud-api'
     static_configs:
-      - targets: ['host.docker.internal:9100']
+      - targets: ['host.docker.internal:8000']
     metrics_path: '/metrics'
     scrape_interval: 5s
 

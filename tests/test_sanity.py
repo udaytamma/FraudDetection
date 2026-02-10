@@ -657,6 +657,10 @@ class TestPolicySystem:
 @pytest.mark.system
 class TestDashboardSystem:
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.environ.get("CI") == "true",
+        reason="Dashboard not available in CI environment"
+    )
     async def test_dashboard_accessible(self, sanity_dashboard_url, sanity_headers):
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(sanity_dashboard_url, headers=sanity_headers)

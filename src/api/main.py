@@ -151,7 +151,7 @@ async def lifespan(app: FastAPI):
 
     # Cleanup
     if redis_client:
-        await redis_client.aclose()
+        await redis_client.aclose()  # type: ignore[attr-defined]
     if evidence_service:
         await evidence_service.close()
     if policy_versioning:

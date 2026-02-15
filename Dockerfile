@@ -20,6 +20,7 @@ COPY config/ config/
 COPY scripts/init_db.sql scripts/init_db.sql
 COPY dashboard.py dashboard.py
 COPY .streamlit/ .streamlit/
+COPY models/ models/
 
 # Switch to non-root user
 USER appuser

@@ -394,50 +394,92 @@ def get_model_registry() -> dict:
         return {}
 
 
-async def get_ml_analytics() -> dict:
-    """Get ML-specific analytics from PostgreSQL."""
+async def get_ml_analytics(window_hours: int | None = 24) -> dict:
+    """Get ML-specific analytics from PostgreSQL.
+
+    Args:
+        window_hours: Number of hours to look back. None means all time.
+    """
     try:
         conn = await asyncpg.connect(POSTGRES_URL)
 
+        if window_hours is not None:
+            where_clause = f"WHERE captured_at > NOW() - INTERVAL '{window_hours} hours'"
+            where_and = f"WHERE ml_score IS NOT NULL AND captured_at > NOW() - INTERVAL '{window_hours} hours'"
+        else:
+            where_clause = ""
+            where_and = "WHERE ml_score IS NOT NULL"
+
         # Variant distribution
-        variant_dist = await conn.fetch("""
+        variant_dist = await conn.fetch(f"""
             SELECT
                 COALESCE(model_variant, 'rules-only') as variant,
                 COUNT(*) as count,
                 AVG(ml_score) as avg_ml_score,
                 AVG(risk_score) as avg_risk_score
             FROM transaction_evidence
-            WHERE captured_at > NOW() - INTERVAL '24 hours'
+            {where_clause}
             GROUP BY model_variant
             ORDER BY count DESC
         """)
 
         # ML score distribution (for histogram)
-        ml_scores = await conn.fetch("""
+        ml_scores = await conn.fetch(f"""
             SELECT ml_score
             FROM transaction_evidence
-            WHERE ml_score IS NOT NULL
-              AND captured_at > NOW() - INTERVAL '24 hours'
+            {where_and}
         """)
 
         # Decision by variant
-        decision_by_variant = await conn.fetch("""
+        decision_by_variant = await conn.fetch(f"""
             SELECT
                 COALESCE(model_variant, 'rules-only') as variant,
                 decision,
                 COUNT(*) as count
             FROM transaction_evidence
-            WHERE captured_at > NOW() - INTERVAL '24 hours'
+            {where_clause}
             GROUP BY model_variant, decision
             ORDER BY variant, decision
         """)
 
+        # ML score vs rules score (for scatter plot)
+        ml_vs_rules = await conn.fetch(f"""
+            SELECT ml_score, criminal_score
+            FROM transaction_evidence
+            {where_and}
+            LIMIT 2000
+        """)
+
+        # ML summary metrics
+        ml_summary = await conn.fetch(f"""
+            SELECT
+                COUNT(*) as total,
+                COUNT(ml_score) as ml_scored,
+                AVG(CASE WHEN model_variant = 'champion' THEN ml_score END) as champion_avg,
+                AVG(CASE WHEN model_variant = 'challenger' THEN ml_score END) as challenger_avg
+            FROM transaction_evidence
+            {where_clause}
+        """)
+
         await conn.close()
+
+        summary = dict(ml_summary[0]) if ml_summary else {}
 
         return {
             "variant_distribution": [dict(r) for r in variant_dist],
             "ml_scores": [float(r["ml_score"]) for r in ml_scores if r["ml_score"] is not None],
             "decision_by_variant": [dict(r) for r in decision_by_variant],
+            "ml_vs_rules": [
+                {"ml_score": float(r["ml_score"]), "criminal_score": float(r["criminal_score"])}
+                for r in ml_vs_rules
+                if r["ml_score"] is not None and r["criminal_score"] is not None
+            ],
+            "summary": {
+                "total": summary.get("total", 0),
+                "ml_scored": summary.get("ml_scored", 0),
+                "champion_avg": float(summary["champion_avg"]) if summary.get("champion_avg") is not None else None,
+                "challenger_avg": float(summary["challenger_avg"]) if summary.get("challenger_avg") is not None else None,
+            },
         }
     except Exception as e:
         return {"error": str(e)}
@@ -1509,10 +1551,26 @@ def main():
 
         st.divider()
 
+        # Time window selector
+        window_options = {
+            "Last 1 hour": 1,
+            "Last 6 hours": 6,
+            "Last 24 hours": 24,
+            "Last 7 days": 168,
+            "All time": None,
+        }
+        selected_window = st.selectbox(
+            "Analytics Window",
+            options=list(window_options.keys()),
+            index=4,  # Default to "All time"
+            key="ml_window",
+        )
+        window_hours = window_options[selected_window]
+
         # ML analytics from DB
-        st.markdown("#### Live Traffic Analytics (24h)")
+        st.markdown(f"#### Live Traffic Analytics ({selected_window.lower()})")
         try:
-            ml_analytics = asyncio.run(get_ml_analytics())
+            ml_analytics = asyncio.run(get_ml_analytics(window_hours=window_hours))
         except Exception as e:
             ml_analytics = {"error": str(e)}
 
@@ -1520,6 +1578,24 @@ def main():
             st.warning(f"Could not load ML analytics: {ml_analytics.get('error')}")
             st.info("Submit transactions with ML enabled to generate analytics data.")
         else:
+            # ML summary metrics row
+            summary = ml_analytics.get("summary", {})
+            total = summary.get("total", 0)
+            ml_scored = summary.get("ml_scored", 0)
+            champion_avg = summary.get("champion_avg")
+            challenger_avg = summary.get("challenger_avg")
+
+            m_cols = st.columns(3)
+            with m_cols[0]:
+                coverage = (ml_scored / total * 100) if total > 0 else 0
+                st.metric("ML Coverage", f"{coverage:.1f}%", help="% of transactions scored by ML model")
+            with m_cols[1]:
+                st.metric("Champion Avg Score", f"{champion_avg:.3f}" if champion_avg is not None else "N/A")
+            with m_cols[2]:
+                st.metric("Challenger Avg Score", f"{challenger_avg:.3f}" if challenger_avg is not None else "N/A")
+
+            st.markdown("")
+
             # Variant distribution
             variant_data = ml_analytics.get("variant_distribution", [])
             if variant_data:
@@ -1574,6 +1650,34 @@ def main():
                     margin=dict(l=20, r=20, t=20, b=20),
                     xaxis_title="ML Score",
                     yaxis_title="Count",
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font={'color': _DARK_TEXT},
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+            # ML Score vs Rules Score scatter plot
+            ml_vs_rules = ml_analytics.get("ml_vs_rules", [])
+            if ml_vs_rules:
+                st.markdown("##### ML Score vs Rules Score")
+                st.caption("Points above the diagonal = ML flags higher risk than rules alone")
+                scatter_df = pd.DataFrame(ml_vs_rules)
+                fig = px.scatter(
+                    scatter_df, x="criminal_score", y="ml_score",
+                    color_discrete_sequence=["#8b5cf6"],
+                    labels={"criminal_score": "Rule-Based Criminal Score", "ml_score": "ML Score"},
+                    opacity=0.4,
+                )
+                # Add diagonal reference line
+                fig.add_shape(
+                    type="line", x0=0, y0=0, x1=1, y1=1,
+                    line=dict(color="#6b7280", width=1, dash="dash"),
+                )
+                fig.update_layout(
+                    height=400,
+                    margin=dict(l=20, r=20, t=20, b=20),
+                    xaxis=dict(range=[0, 1]),
+                    yaxis=dict(range=[0, 1]),
                     paper_bgcolor='rgba(0,0,0,0)',
                     plot_bgcolor='rgba(0,0,0,0)',
                     font={'color': _DARK_TEXT},

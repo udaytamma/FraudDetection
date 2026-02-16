@@ -8,7 +8,7 @@ environment variable handling with validation.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, computed_field
+from pydantic import Field, computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -254,6 +254,28 @@ class Settings(BaseSettings):
         if not self.cors_allow_origins:
             return []
         return [origin.strip() for origin in self.cors_allow_origins.split(",") if origin.strip()]
+
+    @model_validator(mode="after")
+    def _validate_production_security(self) -> "Settings":
+        """Enforce required security settings in production."""
+        if self.app_env == "production":
+            missing: list[str] = []
+            if not self.api_token:
+                missing.append("API_TOKEN")
+            if not self.admin_token:
+                missing.append("ADMIN_TOKEN")
+            if not self.metrics_token:
+                missing.append("METRICS_TOKEN")
+            if not self.evidence_vault_key:
+                missing.append("EVIDENCE_VAULT_KEY")
+            if not self.evidence_hash_key:
+                missing.append("EVIDENCE_HASH_KEY")
+            if missing:
+                raise ValueError(
+                    "Missing required settings for production: "
+                    + ", ".join(missing)
+                )
+        return self
 
     # =========================================================================
     # Feature Store Configuration (Velocity Windows)

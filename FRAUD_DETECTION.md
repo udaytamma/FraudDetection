@@ -452,6 +452,10 @@ Production recommendation: Use Celery or similar task queue with retry and DLQ.
 |---------|---------------|--------|
 | API token auth | Static `API_TOKEN` via `X-API-Key` header on all `/decide` and `/policy/*` endpoints | Implemented |
 | Admin token separation | Separate `ADMIN_TOKEN` for policy mutation endpoints (`PUT /policy/thresholds`, `POST /policy/rules`) | Implemented |
+| Fail-closed production config | Service refuses to start in `APP_ENV=production` if tokens or vault keys are missing | Implemented |
+
+> **Design rationale (fail-closed):** The validator runs at startup, not at request time. If Railway is missing a key, the container crashes immediately on deploy rather than running for hours and failing on the first encrypt call. This is the same pattern Stripe and AWS use for secret validation -- catch misconfiguration during deploy, not during a customer request at 2am.
+
 | Private networking | Dashboard -> API communication over Railway private network (`api.railway.internal:8080`), not public internet | Implemented |
 | Health endpoint (no auth) | `GET /health` is unauthenticated -- allows Railway health checks and external monitoring | By design |
 | CORS | `CORS_ALLOW_ORIGINS="*"` -- permissive for demo, would be locked to dashboard domain in production | Accepted risk |

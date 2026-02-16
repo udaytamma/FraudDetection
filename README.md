@@ -100,7 +100,8 @@ Open [http://localhost:8089](http://localhost:8089) for the load testing dashboa
 
 ## Authentication & RBAC
 
-The API uses a three-tier token authentication system. All tokens are optional—if not configured, endpoints are open.
+The API uses a three-tier token authentication system. Tokens are optional for local development, but **required in production**.
+When `APP_ENV=production`, the service will refuse to start unless `API_TOKEN`, `ADMIN_TOKEN`, and `METRICS_TOKEN` are set.
 
 ### Token Types
 
@@ -141,6 +142,23 @@ curl -H "X-API-Key: $API_TOKEN" http://localhost:8000/decide
 # Generate a secure random token
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
+
+### Public Demo / Production Requirements
+
+For a public demo (or any production-like deployment), set **all** of the following:
+
+```bash
+APP_ENV=production
+API_TOKEN=...
+ADMIN_TOKEN=...
+METRICS_TOKEN=...
+EVIDENCE_VAULT_KEY=...
+EVIDENCE_HASH_KEY=...
+```
+
+If any are missing, startup will fail by design.
+
+**Why fail-closed?** The validator runs at Settings construction (startup), not at request time. If a key is missing, the container crashes immediately on deploy -- catching misconfiguration during deployment, not during a customer request at 2am. This follows the same pattern Stripe and AWS use for secret validation.
 
 ---
 

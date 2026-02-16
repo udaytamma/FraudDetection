@@ -518,33 +518,43 @@ async def get_decision_history(limit: int = 100) -> pd.DataFrame:
     return pd.DataFrame()
 
 
-async def get_analytics_data() -> dict:
-    """Get aggregated analytics data."""
+async def get_analytics_data(window_hours: int | None = None) -> dict:
+    """Get aggregated analytics data.
+
+    Args:
+        window_hours: Number of hours to look back. None means all time.
+    """
     try:
         conn = await asyncpg.connect(POSTGRES_URL)
 
+        if window_hours is not None:
+            time_filter = f"WHERE captured_at > NOW() - INTERVAL '{window_hours} hours'"
+        else:
+            time_filter = ""
+
         # Decision distribution
-        decision_dist = await conn.fetch("""
+        decision_dist = await conn.fetch(f"""
             SELECT decision, COUNT(*) as count
             FROM transaction_evidence
-            WHERE captured_at > NOW() - INTERVAL '24 hours'
+            {time_filter}
             GROUP BY decision
         """)
 
-        # Hourly volume
-        hourly_volume = await conn.fetch("""
+        # Hourly volume (always show recent window for chart readability)
+        volume_filter = f"WHERE captured_at > NOW() - INTERVAL '{window_hours} hours'" if window_hours else "WHERE captured_at > NOW() - INTERVAL '168 hours'"
+        hourly_volume = await conn.fetch(f"""
             SELECT
                 DATE_TRUNC('hour', captured_at) as hour,
                 COUNT(*) as count,
                 AVG(processing_time_ms) as avg_latency
             FROM transaction_evidence
-            WHERE captured_at > NOW() - INTERVAL '24 hours'
+            {volume_filter}
             GROUP BY DATE_TRUNC('hour', captured_at)
             ORDER BY hour
         """)
 
         # Score distribution
-        score_stats = await conn.fetchrow("""
+        score_stats = await conn.fetchrow(f"""
             SELECT
                 AVG(risk_score) as avg_risk,
                 PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY risk_score) as median_risk,
@@ -553,7 +563,7 @@ async def get_analytics_data() -> dict:
                 PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY processing_time_ms) as p99_latency,
                 COUNT(*) as total_count
             FROM transaction_evidence
-            WHERE captured_at > NOW() - INTERVAL '24 hours'
+            {time_filter}
         """)
 
         await conn.close()
@@ -1269,9 +1279,25 @@ def main():
     with tabs[1]:
         st.subheader("Analytics Dashboard")
 
+        # Time-window selector
+        analytics_window_options = {
+            "Last 1 hour": 1,
+            "Last 6 hours": 6,
+            "Last 24 hours": 24,
+            "Last 7 days": 168,
+            "All time": None,
+        }
+        selected_analytics_window = st.selectbox(
+            "Analytics Window",
+            options=list(analytics_window_options.keys()),
+            index=4,  # Default to "All time"
+            key="analytics_window",
+        )
+        analytics_window_hours = analytics_window_options[selected_analytics_window]
+
         # Get analytics data
         try:
-            analytics = asyncio.run(get_analytics_data())
+            analytics = asyncio.run(get_analytics_data(window_hours=analytics_window_hours))
         except Exception as e:
             analytics = {"error": str(e)}
 
@@ -1281,11 +1307,12 @@ def main():
         else:
             # Key metrics
             stats = analytics.get("score_stats", {})
+            window_label = selected_analytics_window.replace("Last ", "")
 
             metric_cols = st.columns(5)
             with metric_cols[0]:
                 st.metric(
-                    "Total Transactions (24h)",
+                    f"Total Transactions ({window_label})",
                     f"{stats.get('total_count', 0):,}"
                 )
             with metric_cols[1]:

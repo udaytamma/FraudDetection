@@ -1060,18 +1060,18 @@ def main():
 
     # Main content tabs
     tabs = st.tabs([
-        "🎯 Transaction Simulator",
         "📊 Analytics Dashboard",
         "📜 Decision History",
         "🤖 ML Performance",
         "⚙️ Policy Inspector",
-        "🔧 Policy Settings"
+        "🔧 Policy Settings",
+        "🎯 Transaction Simulator",
     ])
 
     # ==========================================================================
-    # Tab 1: Transaction Simulator
+    # Tab 6: Transaction Simulator
     # ==========================================================================
-    with tabs[0]:
+    with tabs[5]:
         col1, col2 = st.columns([1, 2])
 
         with col1:
@@ -1274,9 +1274,9 @@ def main():
                 st.info("Submit a transaction to see results")
 
     # ==========================================================================
-    # Tab 2: Analytics Dashboard
+    # Tab 1: Analytics Dashboard
     # ==========================================================================
-    with tabs[1]:
+    with tabs[0]:
         st.subheader("Analytics Dashboard")
 
         # Time-window selector
@@ -1424,9 +1424,9 @@ def main():
                 st.plotly_chart(fig, use_container_width=True)
 
     # ==========================================================================
-    # Tab 3: Decision History
+    # Tab 2: Decision History
     # ==========================================================================
-    with tabs[2]:
+    with tabs[1]:
         st.subheader("Decision History")
 
         # Filters
@@ -1500,9 +1500,9 @@ def main():
             st.info("No transaction history found. Submit some transactions first.")
 
     # ==========================================================================
-    # Tab 4: ML Performance
+    # Tab 3: ML Performance
     # ==========================================================================
-    with tabs[3]:
+    with tabs[2]:
         st.subheader("ML Model Performance")
 
         # Model registry info
@@ -1739,9 +1739,9 @@ def main():
                 st.plotly_chart(fig, use_container_width=True)
 
     # ==========================================================================
-    # Tab 5: Policy Inspector
+    # Tab 4: Policy Inspector
     # ==========================================================================
-    with tabs[4]:
+    with tabs[3]:
         st.subheader("Policy Inspector")
 
         # Load policy file
@@ -1818,9 +1818,9 @@ def main():
             st.error(f"Could not load policy: {e}")
 
     # ==========================================================================
-    # Tab 6: Policy Settings
+    # Tab 5: Policy Settings
     # ==========================================================================
-    with tabs[5]:
+    with tabs[4]:
         st.subheader("Policy Settings")
         st.markdown("*Manage policy configuration with full version control*")
 

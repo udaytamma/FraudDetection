@@ -196,6 +196,31 @@ st.markdown("""
         text-align: center;
     }
 
+    /* Decision history table */
+    .styled-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+    }
+    .styled-table th {
+        background-color: #1e293b;
+        color: #94a3b8;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        padding: 0.6rem 0.75rem;
+        text-align: left;
+        border-bottom: 2px solid #334155;
+    }
+    .styled-table td {
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid #1e293b;
+        color: #e2e8f0;
+    }
+    .styled-table tr:hover td {
+        background-color: rgba(59, 130, 246, 0.08);
+    }
+
     /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -978,7 +1003,7 @@ def main():
     <div class="dashboard-header">
         <h1 style="margin: 0; font-size: 2rem;">📱 Telco/MSP Payment Fraud Detection</h1>
         <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">
-            Real-time payment fraud detection for Mobile &amp; Broadband services with &lt;200ms latency
+            Real-time fraud decisioning | Champion/Challenger ML | Hot-reload policy engine | &lt;200ms P99
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -1043,11 +1068,17 @@ def main():
 
         st.divider()
 
-        # API Info
-        st.subheader("API Endpoints")
-        st.code(f"Health: {API_URL}/health")
-        st.code(f"Decide: POST {API_URL}/decide")
-        st.code(f"Metrics: {API_URL}/metrics")
+        # Architecture Highlights
+        st.subheader("Architecture")
+        st.markdown("""
+        <div style="font-size: 0.85rem; line-height: 1.6;">
+        <div style="margin-bottom: 0.5rem;"><span style="color: #3b82f6;">&#9632;</span> <b>Latency:</b> &lt;200ms P99 target</div>
+        <div style="margin-bottom: 0.5rem;"><span style="color: #10b981;">&#9632;</span> <b>Scoring:</b> Rules + ML A/B testing</div>
+        <div style="margin-bottom: 0.5rem;"><span style="color: #f59e0b;">&#9632;</span> <b>Infra:</b> Redis + Postgres + Prometheus</div>
+        <div style="margin-bottom: 0.5rem;"><span style="color: #8b5cf6;">&#9632;</span> <b>Evidence:</b> Encrypted audit vault</div>
+        <div><span style="color: #ef4444;">&#9632;</span> <b>Policy:</b> Hot-reload, version controlled</div>
+        </div>
+        """, unsafe_allow_html=True)
 
         st.divider()
 
@@ -1174,12 +1205,38 @@ def main():
                 decision = result.get("decision", "N/A")
                 st.markdown(f"### {get_decision_badge(decision)}", unsafe_allow_html=True)
 
+                # Executive summary: plain-English explanation
+                risk_score = result.get("scores", {}).get("risk_score", 0)
+                reasons = result.get("reasons", [])
+                processing_ms = result.get("processing_time_ms", 0)
+                slo_met = processing_ms < 200
+
+                reason_summary = ""
+                if reasons:
+                    top_reasons = [r.get("code", "UNKNOWN") for r in reasons[:3]]
+                    reason_summary = f" Triggered by: <b>{', '.join(top_reasons)}</b>."
+                elif decision == "ALLOW":
+                    reason_summary = " No risk factors detected."
+
+                slo_tag = f'<span style="color:#10b981;">within SLO</span>' if slo_met else f'<span style="color:#ef4444;">SLO breach</span>'
+
+                st.markdown(f"""
+                <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;">
+                    <span style="font-size:0.95rem;color:#e2e8f0;">
+                        <b>Decision: {decision}</b> with risk score <b>{risk_score*100:.0f}%</b> in <b>{processing_ms:.1f}ms</b> ({slo_tag}).{reason_summary}
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+
                 # Metrics row
                 metric_cols = st.columns(4)
                 with metric_cols[0]:
                     st.metric("Transaction ID", result.get("transaction_id", "N/A")[:16] + "...")
                 with metric_cols[1]:
-                    st.metric("Processing Time", f"{result.get('processing_time_ms', 0):.2f}ms")
+                    lat_delta = processing_ms - 200
+                    st.metric("Processing Time", f"{processing_ms:.2f}ms",
+                              delta=f"{lat_delta:+.0f}ms vs SLO" if processing_ms > 0 else None,
+                              delta_color="inverse")
                 with metric_cols[2]:
                     st.metric("Policy Version", result.get("policy_version", "N/A"))
                 with metric_cols[3]:
@@ -1309,31 +1366,48 @@ def main():
             stats = analytics.get("score_stats", {})
             window_label = selected_analytics_window.replace("Last ", "")
 
+            _SLO_TARGET_MS = 200  # P99 latency SLO target
+
             metric_cols = st.columns(5)
             with metric_cols[0]:
                 st.metric(
                     f"Total Transactions ({window_label})",
-                    f"{stats.get('total_count', 0):,}"
+                    f"{stats.get('total_count', 0):,}",
+                    help="Total fraud decisions processed in this time window"
                 )
             with metric_cols[1]:
+                avg_risk = (stats.get('avg_risk', 0) or 0) * 100
                 st.metric(
                     "Avg Risk Score",
-                    f"{(stats.get('avg_risk', 0) or 0)*100:.1f}%"
+                    f"{avg_risk:.1f}%",
+                    help="Mean risk score across all transactions. Lower is better."
                 )
             with metric_cols[2]:
+                p95_risk = (stats.get('p95_risk', 0) or 0) * 100
                 st.metric(
                     "P95 Risk Score",
-                    f"{(stats.get('p95_risk', 0) or 0)*100:.1f}%"
+                    f"{p95_risk:.1f}%",
+                    help="95th percentile risk score -- tail risk indicator"
                 )
             with metric_cols[3]:
+                avg_lat = stats.get('avg_latency', 0) or 0
+                lat_delta = avg_lat - _SLO_TARGET_MS
                 st.metric(
                     "Avg Latency",
-                    f"{stats.get('avg_latency', 0) or 0:.1f}ms"
+                    f"{avg_lat:.1f}ms",
+                    delta=f"{lat_delta:+.0f}ms vs SLO" if avg_lat > 0 else None,
+                    delta_color="inverse",
+                    help=f"Average end-to-end decision latency. SLO target: <{_SLO_TARGET_MS}ms"
                 )
             with metric_cols[4]:
+                p99_lat = stats.get('p99_latency', 0) or 0
+                p99_delta = p99_lat - _SLO_TARGET_MS
                 st.metric(
                     "P99 Latency",
-                    f"{stats.get('p99_latency', 0) or 0:.1f}ms"
+                    f"{p99_lat:.1f}ms",
+                    delta=f"{p99_delta:+.0f}ms vs SLO" if p99_lat > 0 else None,
+                    delta_color="inverse",
+                    help=f"99th percentile latency. SLO target: <{_SLO_TARGET_MS}ms P99"
                 )
 
             st.divider()
@@ -1396,7 +1470,7 @@ def main():
                     st.info("No hourly data available")
 
             # Latency chart
-            st.markdown("#### Latency Over Time")
+            st.markdown("#### Latency vs SLO Target (200ms)")
             if hourly_data:
                 df = pd.DataFrame(hourly_data)
                 fig = px.line(
@@ -1406,11 +1480,26 @@ def main():
                     markers=True,
                     color_discrete_sequence=["#8b5cf6"]
                 )
+                # SLO compliance zone shading
+                fig.add_hrect(
+                    y0=0, y1=200,
+                    fillcolor="#10b981", opacity=0.06,
+                    line_width=0,
+                    annotation_text="SLO Compliant", annotation_position="top left",
+                    annotation_font_color="#10b981", annotation_font_size=11,
+                )
+                fig.add_hrect(
+                    y0=200, y1=max(float(df["avg_latency"].max()) * 1.2, 400),
+                    fillcolor="#ef4444", opacity=0.06,
+                    line_width=0,
+                    annotation_text="SLO Breach", annotation_position="top left",
+                    annotation_font_color="#ef4444", annotation_font_size=11,
+                )
                 fig.add_hline(
                     y=200,
                     line_dash="dash",
-                    line_color="red",
-                    annotation_text="Target: 200ms"
+                    line_color="#ef4444",
+                    annotation_text="P99 Target: 200ms"
                 )
                 fig.update_layout(
                     margin=dict(l=20, r=20, t=20, b=20),
@@ -1464,21 +1553,32 @@ def main():
             df["latency"] = df["processing_time_ms"].apply(lambda x: f"{x:.1f}ms" if x else "N/A")
             df["time"] = pd.to_datetime(df["captured_at"]).dt.strftime("%Y-%m-%d %H:%M:%S")
 
-            # Display table
-            st.dataframe(
-                df[["transaction_id", "decision", "amount", "risk", "ml", "variant", "latency", "time"]],
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "transaction_id": st.column_config.TextColumn("Transaction ID", width="medium"),
-                    "decision": st.column_config.TextColumn("Decision", width="small"),
-                    "amount": st.column_config.TextColumn("Amount", width="small"),
-                    "risk": st.column_config.TextColumn("Risk Score", width="small"),
-                    "ml": st.column_config.TextColumn("ML Score", width="small"),
-                    "variant": st.column_config.TextColumn("Variant", width="small"),
-                    "latency": st.column_config.TextColumn("Latency", width="small"),
-                    "time": st.column_config.TextColumn("Time", width="medium"),
-                }
+            # Decision color HTML for visual emphasis
+            _DECISION_COLORS = {
+                "ALLOW": "#10b981",
+                "FRICTION": "#f59e0b",
+                "REVIEW": "#f97316",
+                "BLOCK": "#ef4444",
+            }
+            df["decision_display"] = df["decision"].apply(
+                lambda d: f'<span style="color:{_DECISION_COLORS.get(d, "#94a3b8")};font-weight:700;">{d}</span>'
+            )
+
+            # Reordered: Decision first, then amount/risk, transaction ID last
+            st.markdown(
+                df[["decision_display", "amount", "risk", "ml", "variant", "latency", "time", "transaction_id"]]
+                .rename(columns={
+                    "decision_display": "Decision",
+                    "amount": "Amount",
+                    "risk": "Risk",
+                    "ml": "ML",
+                    "variant": "Variant",
+                    "latency": "Latency",
+                    "time": "Time",
+                    "transaction_id": "Transaction ID",
+                })
+                .to_html(escape=False, index=False, classes="styled-table"),
+                unsafe_allow_html=True,
             )
 
             # Summary stats
@@ -1548,9 +1648,18 @@ def main():
                 else:
                     st.info("No challenger model registered")
 
-            # AUC comparison bar chart
+            # AUC comparison bar chart with winner indicator
             if champion and challenger:
-                st.markdown("#### AUC Comparison")
+                champ_auc = champion.get("auc", 0)
+                chall_auc = challenger.get("auc", 0)
+                auc_delta = chall_auc - champ_auc
+                if auc_delta > 0:
+                    winner_text = f'<span style="color:#f59e0b;font-weight:600;">Challenger leads by +{auc_delta:.4f}</span>'
+                elif auc_delta < 0:
+                    winner_text = f'<span style="color:#10b981;font-weight:600;">Champion leads by +{abs(auc_delta):.4f}</span>'
+                else:
+                    winner_text = '<span style="color:#94a3b8;">Models tied</span>'
+                st.markdown(f"#### AUC Comparison &nbsp;&nbsp; {winner_text}", unsafe_allow_html=True)
                 auc_data = pd.DataFrame({
                     "Model": [f"Champion ({champion.get('framework', '?')})", f"Challenger ({challenger.get('framework', '?')})"],
                     "AUC": [champion.get("auc", 0), challenger.get("auc", 0)]
@@ -1763,7 +1872,7 @@ def main():
 
             st.divider()
 
-            # Thresholds
+            # Thresholds as visual cascade bars
             st.markdown("#### Score Thresholds")
             thresholds = policy.get("thresholds", {})
 
@@ -1771,9 +1880,24 @@ def main():
             for i, (name, thresh) in enumerate(thresholds.items()):
                 with thresh_cols[i % 3]:
                     st.markdown(f"**{name.title()} Score**")
-                    st.markdown(f"- Block: ≥ {thresh.get('block_threshold', 0)*100:.0f}%")
-                    st.markdown(f"- Review: ≥ {thresh.get('review_threshold', 0)*100:.0f}%")
-                    st.markdown(f"- Friction: ≥ {thresh.get('friction_threshold', 0)*100:.0f}%")
+                    friction_pct = thresh.get('friction_threshold', 0) * 100
+                    review_pct = thresh.get('review_threshold', 0) * 100
+                    block_pct = thresh.get('block_threshold', 0) * 100
+
+                    st.markdown(f"""
+                    <div style="background:#0f172a;border-radius:6px;overflow:hidden;height:28px;position:relative;margin:0.5rem 0;">
+                        <div style="position:absolute;left:0;top:0;height:100%;width:{friction_pct}%;background:#10b981;opacity:0.3;"></div>
+                        <div style="position:absolute;left:{friction_pct}%;top:0;height:100%;width:{review_pct - friction_pct}%;background:#f59e0b;opacity:0.3;"></div>
+                        <div style="position:absolute;left:{review_pct}%;top:0;height:100%;width:{block_pct - review_pct}%;background:#f97316;opacity:0.3;"></div>
+                        <div style="position:absolute;left:{block_pct}%;top:0;height:100%;width:{100 - block_pct}%;background:#ef4444;opacity:0.3;"></div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#94a3b8;">
+                        <span style="color:#10b981;">Allow &lt;{friction_pct:.0f}%</span>
+                        <span style="color:#f59e0b;">Friction {friction_pct:.0f}%</span>
+                        <span style="color:#f97316;">Review {review_pct:.0f}%</span>
+                        <span style="color:#ef4444;">Block {block_pct:.0f}%+</span>
+                    </div>
+                    """, unsafe_allow_html=True)
 
             st.divider()
 

@@ -68,153 +68,170 @@ st.markdown("""
 
     /* Main container styling */
     .main .block-container {
-        padding-top: 2rem;
+        padding-top: 1.5rem;
         padding-bottom: 2rem;
     }
 
-    /* Card styling */
-    .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 12px;
-        padding: 1.5rem;
-        color: white;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-
     /* Status indicators */
-    .status-healthy {
-        color: #10b981;
-        font-weight: 600;
-    }
-    .status-degraded {
-        color: #f59e0b;
-        font-weight: 600;
-    }
-    .status-down {
-        color: #ef4444;
-        font-weight: 600;
-    }
+    .status-healthy { color: #10b981; font-weight: 600; }
+    .status-degraded { color: #f59e0b; font-weight: 600; }
+    .status-down { color: #ef4444; font-weight: 600; }
 
     /* Decision badges - white text on colored bg, works in both modes */
     .decision-allow {
-        background-color: #10b981;
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 9999px;
-        font-weight: 600;
-        display: inline-block;
+        background-color: #10b981; color: white;
+        padding: 0.5rem 1rem; border-radius: 9999px;
+        font-weight: 600; display: inline-block;
     }
     .decision-friction {
-        background-color: #f59e0b;
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 9999px;
-        font-weight: 600;
-        display: inline-block;
+        background-color: #f59e0b; color: white;
+        padding: 0.5rem 1rem; border-radius: 9999px;
+        font-weight: 600; display: inline-block;
     }
     .decision-review {
-        background-color: #f97316;
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 9999px;
-        font-weight: 600;
-        display: inline-block;
+        background-color: #f97316; color: white;
+        padding: 0.5rem 1rem; border-radius: 9999px;
+        font-weight: 600; display: inline-block;
     }
     .decision-block {
-        background-color: #ef4444;
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 9999px;
-        font-weight: 600;
-        display: inline-block;
+        background-color: #ef4444; color: white;
+        padding: 0.5rem 1rem; border-radius: 9999px;
+        font-weight: 600; display: inline-block;
     }
 
-    /* Severity badges - white text on colored bg, works in both modes */
+    /* Severity badges */
     .severity-critical {
-        background-color: #7f1d1d;
-        color: white;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: 600;
+        background-color: #7f1d1d; color: white;
+        padding: 0.25rem 0.5rem; border-radius: 4px;
+        font-size: 0.75rem; font-weight: 600;
     }
     .severity-high {
-        background-color: #ef4444;
-        color: white;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: 600;
+        background-color: #ef4444; color: white;
+        padding: 0.25rem 0.5rem; border-radius: 4px;
+        font-size: 0.75rem; font-weight: 600;
     }
     .severity-medium {
-        background-color: #f59e0b;
-        color: white;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: 600;
+        background-color: #f59e0b; color: white;
+        padding: 0.25rem 0.5rem; border-radius: 4px;
+        font-size: 0.75rem; font-weight: 600;
     }
     .severity-low {
-        background-color: #6b7280;
-        color: white;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: 600;
+        background-color: #6b7280; color: white;
+        padding: 0.25rem 0.5rem; border-radius: 4px;
+        font-size: 0.75rem; font-weight: 600;
     }
 
     /* Score gauge styling */
-    .score-container {
-        text-align: center;
-        padding: 1rem;
-    }
+    .score-container { text-align: center; padding: 1rem; }
 
     /* Reason card */
     .reason-card {
         background-color: #1e293b;
         border-left: 4px solid #ef4444;
-        padding: 1rem;
-        margin: 0.5rem 0;
+        padding: 1rem; margin: 0.5rem 0;
         border-radius: 0 8px 8px 0;
     }
 
-    /* Header styling - gradient works in both modes */
+    /* Header styling */
     .dashboard-header {
-        background: linear-gradient(90deg, #1e3a5f 0%, #2d5a87 100%);
-        padding: 1.5rem;
-        border-radius: 12px;
+        background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%);
+        padding: 2rem 2.5rem;
+        border-radius: 16px;
         color: white;
-        margin-bottom: 2rem;
+        margin-bottom: 1rem;
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    }
+    .dashboard-header h1 {
+        margin: 0; font-size: 1.75rem; font-weight: 700;
+        letter-spacing: -0.02em;
+    }
+    .dashboard-header .subtitle {
+        margin: 0.5rem 0 0 0; opacity: 0.85; font-size: 0.95rem;
+        line-height: 1.5; max-width: 700px;
+    }
+    .dashboard-header .tech-pills {
+        margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;
+    }
+    .dashboard-header .tech-pill {
+        background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+        padding: 0.25rem 0.75rem; border-radius: 9999px;
+        font-size: 0.75rem; font-weight: 500; color: rgba(255,255,255,0.9);
+    }
+
+    /* Tab intro banner */
+    .tab-intro {
+        background: linear-gradient(90deg, rgba(59,130,246,0.08) 0%, rgba(59,130,246,0.02) 100%);
+        border-left: 3px solid #3b82f6;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1.25rem;
+        border-radius: 0 8px 8px 0;
+        font-size: 0.9rem;
+        color: #cbd5e1;
+        line-height: 1.5;
+    }
+
+    /* Quick Guide popup */
+    .quick-guide-overlay {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.6); z-index: 9998;
+        backdrop-filter: blur(4px);
+    }
+    .quick-guide {
+        background: #0f172a; border: 1px solid #334155;
+        border-radius: 16px; padding: 2rem; max-width: 640px;
+        margin: 0 auto; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        color: #e2e8f0;
+    }
+    .quick-guide h3 {
+        margin: 0 0 0.25rem 0; font-size: 1.25rem; color: white;
+    }
+    .quick-guide .guide-subtitle {
+        color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem;
+    }
+    .guide-activity {
+        background: #1e293b; border: 1px solid #334155;
+        border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem;
+        transition: border-color 0.2s;
+    }
+    .guide-activity:hover { border-color: #3b82f6; }
+    .guide-activity-number {
+        background: #3b82f6; color: white; width: 28px; height: 28px;
+        border-radius: 50%; display: inline-flex; align-items: center;
+        justify-content: center; font-weight: 700; font-size: 0.85rem;
+        margin-right: 0.75rem; flex-shrink: 0;
+    }
+    .guide-activity h4 {
+        margin: 0 0 0.5rem 0; color: white; font-size: 1rem;
+        display: flex; align-items: center;
+    }
+    .guide-step {
+        display: flex; align-items: flex-start; gap: 0.5rem;
+        margin: 0.35rem 0; padding-left: 2.75rem;
+        font-size: 0.85rem; color: #cbd5e1;
+    }
+    .guide-step-marker {
+        color: #3b82f6; font-weight: 600; flex-shrink: 0;
     }
 
     /* Metric box */
     .metric-box {
-        background-color: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 8px;
-        padding: 1rem;
-        text-align: center;
+        background-color: #1e293b; border: 1px solid #334155;
+        border-radius: 8px; padding: 1rem; text-align: center;
     }
 
     /* Decision history table */
     .styled-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.85rem;
+        width: 100%; border-collapse: collapse; font-size: 0.85rem;
     }
     .styled-table th {
-        background-color: #1e293b;
-        color: #94a3b8;
-        text-transform: uppercase;
-        font-size: 0.75rem;
-        letter-spacing: 0.05em;
-        padding: 0.6rem 0.75rem;
-        text-align: left;
-        border-bottom: 2px solid #334155;
+        background-color: #1e293b; color: #94a3b8;
+        text-transform: uppercase; font-size: 0.75rem;
+        letter-spacing: 0.05em; padding: 0.6rem 0.75rem;
+        text-align: left; border-bottom: 2px solid #334155;
     }
     .styled-table td {
-        padding: 0.5rem 0.75rem;
-        border-bottom: 1px solid #1e293b;
+        padding: 0.5rem 0.75rem; border-bottom: 1px solid #1e293b;
         color: #e2e8f0;
     }
     .styled-table tr:hover td {
@@ -225,19 +242,55 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Tab styling */
+    /* Tab styling - professional look */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
+        gap: 4px;
+        background-color: #0f172a;
+        padding: 4px;
+        border-radius: 12px;
+        border: 1px solid #1e293b;
     }
     .stTabs [data-baseweb="tab"] {
-        background-color: #1e293b;
-        color: #e2e8f0;
-        border-radius: 8px 8px 0 0;
+        background-color: transparent;
+        color: #94a3b8;
+        border-radius: 8px;
         padding: 0.5rem 1rem;
+        font-weight: 500;
+        font-size: 0.85rem;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #e2e8f0;
+        background-color: rgba(59, 130, 246, 0.1);
     }
     .stTabs [aria-selected="true"] {
-        background-color: #3b82f6;
+        background-color: #1e3a5f !important;
         color: white !important;
+        font-weight: 600;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .stTabs [data-baseweb="tab-highlight"] {
+        display: none;
+    }
+    .stTabs [data-baseweb="tab-border"] {
+        display: none;
+    }
+
+    /* Empty state styling */
+    .empty-state {
+        text-align: center; padding: 3rem 2rem;
+        color: #64748b;
+    }
+    .empty-state-icon { font-size: 2.5rem; margin-bottom: 1rem; }
+    .empty-state-title {
+        font-size: 1.1rem; font-weight: 600; color: #94a3b8;
+        margin-bottom: 0.5rem;
+    }
+    .empty-state-desc { font-size: 0.9rem; max-width: 400px; margin: 0 auto; }
+
+    /* Sidebar polish */
+    section[data-testid="stSidebar"] {
+        background-color: #0f172a;
+        border-right: 1px solid #1e293b;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -998,85 +1051,124 @@ TRANSACTION_PRESETS = {
 # ============================================================================
 
 def main():
-    # Header
+    # Header - hiring-manager-friendly value prop
     st.markdown("""
     <div class="dashboard-header">
-        <h1 style="margin: 0; font-size: 2rem;">📱 Telco/MSP Payment Fraud Detection</h1>
-        <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">
-            Real-time fraud decisioning | Champion/Challenger ML | Hot-reload policy engine | &lt;200ms P99
+        <h1>Telco/MSP Payment Fraud Detection Platform</h1>
+        <p class="subtitle">
+            Real-time payment fraud detection engine for Telecom and Managed Service Providers.
+            Every transaction is scored in under 200ms using a combination of rule-based detectors
+            and ML models with Champion/Challenger A/B testing.
         </p>
+        <div class="tech-pills">
+            <span class="tech-pill">FastAPI</span>
+            <span class="tech-pill">PostgreSQL</span>
+            <span class="tech-pill">Redis</span>
+            <span class="tech-pill">scikit-learn + XGBoost</span>
+            <span class="tech-pill">Prometheus</span>
+            <span class="tech-pill">Hot-Reload Policy</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Sidebar - System Status
+    # Quick Guide button + popup
+    if "show_guide" not in st.session_state:
+        st.session_state.show_guide = False
+
+    guide_cols = st.columns([1, 6])
+    with guide_cols[0]:
+        if st.button("Quick Guide", type="secondary", use_container_width=True):
+            st.session_state.show_guide = not st.session_state.show_guide
+
+    if st.session_state.show_guide:
+        st.markdown("""
+        <div class="quick-guide">
+            <h3>Quick Guide</h3>
+            <p class="guide-subtitle">Three things you can do on this dashboard right now:</p>
+
+            <div class="guide-activity">
+                <h4><span class="guide-activity-number">1</span> Run a Fraud Simulation</h4>
+                <div class="guide-step"><span class="guide-step-marker">a.</span> Go to the <b>Simulate</b> tab</div>
+                <div class="guide-step"><span class="guide-step-marker">b.</span> Pick a preset scenario (e.g. "SIM Swap Fraud" or "Normal Activation")</div>
+                <div class="guide-step"><span class="guide-step-marker">c.</span> Click <b>Submit Transaction</b> and watch the real-time decision</div>
+                <div class="guide-step"><span class="guide-step-marker">d.</span> Review the risk scores, triggered rules, and latency metrics</div>
+            </div>
+
+            <div class="guide-activity">
+                <h4><span class="guide-activity-number">2</span> Review Detection Analytics</h4>
+                <div class="guide-step"><span class="guide-step-marker">a.</span> Go to the <b>Overview</b> tab after running a few simulations</div>
+                <div class="guide-step"><span class="guide-step-marker">b.</span> Check decision distribution (Allow vs Block vs Friction vs Review)</div>
+                <div class="guide-step"><span class="guide-step-marker">c.</span> Monitor latency vs the 200ms SLO target</div>
+            </div>
+
+            <div class="guide-activity">
+                <h4><span class="guide-activity-number">3</span> Inspect the Policy Engine</h4>
+                <div class="guide-step"><span class="guide-step-marker">a.</span> Go to the <b>Policy</b> tab</div>
+                <div class="guide-step"><span class="guide-step-marker">b.</span> View score thresholds that control Allow/Friction/Review/Block decisions</div>
+                <div class="guide-step"><span class="guide-step-marker">c.</span> Explore active rules, blocklists, and version history with rollback</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("")
+
+    # Sidebar - System Status (compact, professional)
     with st.sidebar:
-        st.header("System Status")
+        st.markdown("### System Status")
 
         health = get_api_health()
 
-        # Overall status
+        # Overall status - prominent indicator
         status = health.get("status", "down")
         if status == "healthy":
-            st.success("● System Healthy")
+            st.success("System Healthy")
         elif status == "degraded":
-            st.warning("● System Degraded")
+            st.warning("System Degraded")
         else:
-            st.error("● System Down")
+            st.error("System Down")
 
-        # Component status
-        st.subheader("Components")
+        # Component status - compact row
         components = health.get("components", {})
-
-        cols = st.columns(3)
-        with cols[0]:
-            if components.get("redis"):
-                st.markdown("✅ Redis")
-            else:
-                st.markdown("❌ Redis")
-        with cols[1]:
-            if components.get("postgres"):
-                st.markdown("✅ Postgres")
-            else:
-                st.markdown("❌ Postgres")
-        with cols[2]:
-            if components.get("policy"):
-                st.markdown("✅ Policy")
-            else:
-                st.markdown("❌ Policy")
+        component_items = [
+            ("Redis", components.get("redis")),
+            ("Postgres", components.get("postgres")),
+            ("Policy", components.get("policy")),
+        ]
+        component_html = " &nbsp; ".join(
+            f'<span style="color:{"#10b981" if ok else "#ef4444"};">{"&#10003;" if ok else "&#10007;"}</span> {name}'
+            for name, ok in component_items
+        )
+        st.markdown(f'<div style="font-size:0.85rem;">{component_html}</div>', unsafe_allow_html=True)
 
         # Policy version
         policy = get_policy_version()
-        st.markdown(f"**Policy Version:** `{policy.get('version', 'N/A')}`")
+        st.caption(f"Policy: v{policy.get('version', 'N/A')}")
 
         st.divider()
 
-        # ML Model Status
-        st.subheader("ML Scoring")
+        # ML Model Status - compact
+        st.markdown("### ML Scoring")
         registry = get_model_registry()
         if registry:
             champion = registry.get("champion")
             challenger = registry.get("challenger")
             if champion:
-                st.markdown(f"**Champion:** `{champion.get('name', 'N/A')}`")
-                st.markdown(f"  AUC: {champion.get('auc', 0):.4f} | {champion.get('framework', '?')}")
+                st.markdown(f"**Champion:** `{champion.get('name', 'N/A')}` (AUC {champion.get('auc', 0):.4f})")
             if challenger:
-                st.markdown(f"**Challenger:** `{challenger.get('name', 'N/A')}`")
-                st.markdown(f"  AUC: {challenger.get('auc', 0):.4f} | {challenger.get('framework', '?')}")
-            st.markdown("✅ ML Enabled")
+                st.markdown(f"**Challenger:** `{challenger.get('name', 'N/A')}` (AUC {challenger.get('auc', 0):.4f})")
         else:
-            st.markdown("⚠️ No models registered")
+            st.caption("No models registered")
 
         st.divider()
 
         # Architecture Highlights
-        st.subheader("Architecture")
+        st.markdown("### Architecture")
         st.markdown("""
-        <div style="font-size: 0.85rem; line-height: 1.6;">
-        <div style="margin-bottom: 0.5rem;"><span style="color: #3b82f6;">&#9632;</span> <b>Latency:</b> &lt;200ms P99 target</div>
-        <div style="margin-bottom: 0.5rem;"><span style="color: #10b981;">&#9632;</span> <b>Scoring:</b> Rules + ML A/B testing</div>
-        <div style="margin-bottom: 0.5rem;"><span style="color: #f59e0b;">&#9632;</span> <b>Infra:</b> Redis + Postgres + Prometheus</div>
-        <div style="margin-bottom: 0.5rem;"><span style="color: #8b5cf6;">&#9632;</span> <b>Evidence:</b> Encrypted audit vault</div>
-        <div><span style="color: #ef4444;">&#9632;</span> <b>Policy:</b> Hot-reload, version controlled</div>
+        <div style="font-size: 0.82rem; line-height: 1.7;">
+        <div><span style="color: #3b82f6;">&#9632;</span> <b>&lt;200ms</b> P99 latency target</div>
+        <div><span style="color: #10b981;">&#9632;</span> <b>Rules + ML</b> A/B testing</div>
+        <div><span style="color: #f59e0b;">&#9632;</span> <b>Redis + Postgres</b> + Prometheus</div>
+        <div><span style="color: #8b5cf6;">&#9632;</span> <b>Encrypted</b> evidence vault</div>
+        <div><span style="color: #ef4444;">&#9632;</span> <b>Hot-reload</b> policy engine</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -1084,25 +1176,31 @@ def main():
 
         # Quick stats from last decision
         if "last_decision" in st.session_state:
-            st.subheader("Last Decision")
+            st.markdown("### Last Decision")
             last = st.session_state.last_decision
             st.markdown(get_decision_badge(last.get("decision", "N/A")), unsafe_allow_html=True)
             st.metric("Latency", f"{last.get('processing_time_ms', 0):.1f}ms")
 
-    # Main content tabs
+    # Main content tabs - reordered for hiring manager flow
     tabs = st.tabs([
-        "📊 Analytics Dashboard",
-        "📜 Decision History",
-        "🤖 ML Performance",
-        "⚙️ Policy Inspector",
-        "🔧 Policy Settings",
-        "🎯 Transaction Simulator",
+        "Overview",
+        "Simulate",
+        "Decision History",
+        "ML Performance",
+        "Policy",
     ])
 
     # ==========================================================================
-    # Tab 6: Transaction Simulator
+    # Tab 2: Transaction Simulator
     # ==========================================================================
-    with tabs[5]:
+    with tabs[1]:
+        st.markdown("""
+        <div class="tab-intro">
+            <b>Simulate fraud transactions</b> against the live detection engine.
+            Pick a preset scenario, submit it, and see the real-time decision with risk scores and triggered rules.
+        </div>
+        """, unsafe_allow_html=True)
+
         col1, col2 = st.columns([1, 2])
 
         with col1:
@@ -1328,13 +1426,27 @@ def main():
                 with st.expander("Raw API Response"):
                     st.json(result)
             else:
-                st.info("Submit a transaction to see results")
+                st.markdown("""
+                <div class="empty-state">
+                    <div class="empty-state-icon">&#127919;</div>
+                    <div class="empty-state-title">No Results Yet</div>
+                    <div class="empty-state-desc">
+                        Select a preset scenario on the left and click <b>Submit Transaction</b>
+                        to see the fraud detection engine in action.
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
     # ==========================================================================
-    # Tab 1: Analytics Dashboard
+    # Tab 1: Overview (Analytics Dashboard)
     # ==========================================================================
     with tabs[0]:
-        st.subheader("Analytics Dashboard")
+        st.markdown("""
+        <div class="tab-intro">
+            <b>System-wide analytics</b> showing transaction volumes, decision distribution,
+            risk score trends, and latency performance against the 200ms SLO target.
+        </div>
+        """, unsafe_allow_html=True)
 
         # Time-window selector
         analytics_window_options = {
@@ -1359,8 +1471,15 @@ def main():
             analytics = {"error": str(e)}
 
         if "error" in analytics:
-            st.warning(f"Could not load analytics: {analytics.get('error')}")
-            st.info("Submit some transactions first to generate analytics data.")
+            st.markdown("""
+            <div class="empty-state">
+                <div class="empty-state-icon">&#128202;</div>
+                <div class="empty-state-title">No Analytics Data</div>
+                <div class="empty-state-desc">
+                    Go to the <b>Simulate</b> tab and submit a few transactions to populate this dashboard with analytics data.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
         else:
             # Key metrics
             stats = analytics.get("score_stats", {})
@@ -1513,10 +1632,15 @@ def main():
                 st.plotly_chart(fig, use_container_width=True)
 
     # ==========================================================================
-    # Tab 2: Decision History
+    # Tab 3: Decision History
     # ==========================================================================
-    with tabs[1]:
-        st.subheader("Decision History")
+    with tabs[2]:
+        st.markdown("""
+        <div class="tab-intro">
+            <b>Full decision audit trail.</b> Every transaction processed by the engine is logged here
+            with its decision, risk scores, ML variant, and processing latency.
+        </div>
+        """, unsafe_allow_html=True)
 
         # Filters
         filter_cols = st.columns(4)
@@ -1597,12 +1721,26 @@ def main():
                 avg_latency = df["processing_time_ms"].mean() if "processing_time_ms" in df else 0
                 st.metric("Avg Latency", f"{avg_latency:.1f}ms")
         else:
-            st.info("No transaction history found. Submit some transactions first.")
+            st.markdown("""
+            <div class="empty-state">
+                <div class="empty-state-icon">&#128220;</div>
+                <div class="empty-state-title">No Transaction History</div>
+                <div class="empty-state-desc">
+                    Submit transactions via the <b>Simulate</b> tab to see the full decision audit trail here.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
     # ==========================================================================
-    # Tab 3: ML Performance
+    # Tab 4: ML Performance
     # ==========================================================================
-    with tabs[2]:
+    with tabs[3]:
+        st.markdown("""
+        <div class="tab-intro">
+            <b>ML model performance and A/B testing.</b> Compare Champion vs Challenger models,
+            view traffic routing distribution, and analyze ML score distributions across live traffic.
+        </div>
+        """, unsafe_allow_html=True)
         st.subheader("ML Model Performance")
 
         # Model registry info
@@ -1848,471 +1986,460 @@ def main():
                 st.plotly_chart(fig, use_container_width=True)
 
     # ==========================================================================
-    # Tab 4: Policy Inspector
-    # ==========================================================================
-    with tabs[3]:
-        st.subheader("Policy Inspector")
-
-        # Load policy file
-        policy_path = os.path.join(os.path.dirname(__file__), "config", "policy.yaml")
-
-        try:
-            import yaml
-            with open(policy_path, "r") as f:
-                policy = yaml.safe_load(f)
-
-            # Policy version
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Version", policy.get("version", "N/A"))
-            with col2:
-                st.metric("Default Action", policy.get("default_action", "ALLOW"))
-
-            st.markdown(f"*{policy.get('description', '')}*")
-
-            st.divider()
-
-            # Thresholds as visual cascade bars
-            st.markdown("#### Score Thresholds")
-            thresholds = policy.get("thresholds", {})
-
-            thresh_cols = st.columns(3)
-            for i, (name, thresh) in enumerate(thresholds.items()):
-                with thresh_cols[i % 3]:
-                    st.markdown(f"**{name.title()} Score**")
-                    friction_pct = thresh.get('friction_threshold', 0) * 100
-                    review_pct = thresh.get('review_threshold', 0) * 100
-                    block_pct = thresh.get('block_threshold', 0) * 100
-
-                    st.markdown(f"""
-                    <div style="background:#0f172a;border-radius:6px;overflow:hidden;height:28px;position:relative;margin:0.5rem 0;">
-                        <div style="position:absolute;left:0;top:0;height:100%;width:{friction_pct}%;background:#10b981;opacity:0.3;"></div>
-                        <div style="position:absolute;left:{friction_pct}%;top:0;height:100%;width:{review_pct - friction_pct}%;background:#f59e0b;opacity:0.3;"></div>
-                        <div style="position:absolute;left:{review_pct}%;top:0;height:100%;width:{block_pct - review_pct}%;background:#f97316;opacity:0.3;"></div>
-                        <div style="position:absolute;left:{block_pct}%;top:0;height:100%;width:{100 - block_pct}%;background:#ef4444;opacity:0.3;"></div>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#94a3b8;">
-                        <span style="color:#10b981;">Allow &lt;{friction_pct:.0f}%</span>
-                        <span style="color:#f59e0b;">Friction {friction_pct:.0f}%</span>
-                        <span style="color:#f97316;">Review {review_pct:.0f}%</span>
-                        <span style="color:#ef4444;">Block {block_pct:.0f}%+</span>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-            st.divider()
-
-            # Rules
-            st.markdown("#### Active Rules")
-            rules = policy.get("rules", [])
-
-            for rule in rules:
-                if rule.get("enabled", True):
-                    with st.expander(f"**{rule.get('name', 'Unknown')}** (Priority: {rule.get('priority', 100)})"):
-                        st.markdown(f"*{rule.get('description', '')}*")
-                        st.markdown(f"**Action:** `{rule.get('action', 'N/A')}`")
-                        if rule.get("friction_type"):
-                            st.markdown(f"**Friction Type:** `{rule['friction_type']}`")
-                        if rule.get("review_priority"):
-                            st.markdown(f"**Review Priority:** `{rule['review_priority']}`")
-                        st.markdown("**Conditions:**")
-                        st.json(rule.get("conditions", {}))
-
-            st.divider()
-
-            # Lists
-            list_cols = st.columns(2)
-            with list_cols[0]:
-                st.markdown("#### Blocklists")
-                st.markdown(f"- Cards: {len(policy.get('blocklist_cards', []))} entries")
-                st.markdown(f"- Devices: {len(policy.get('blocklist_devices', []))} entries")
-                st.markdown(f"- IPs: {len(policy.get('blocklist_ips', []))} entries")
-                st.markdown(f"- Users: {len(policy.get('blocklist_users', []))} entries")
-
-            with list_cols[1]:
-                st.markdown("#### Allowlists")
-                st.markdown(f"- Cards: {len(policy.get('allowlist_cards', []))} entries")
-                st.markdown(f"- Users: {len(policy.get('allowlist_users', []))} entries")
-                st.markdown(f"- Services: {len(policy.get('allowlist_services', []))} entries")
-
-            # Raw YAML
-            with st.expander("Raw Policy YAML"):
-                st.code(yaml.dump(policy, default_flow_style=False), language="yaml")
-
-        except Exception as e:
-            st.error(f"Could not load policy: {e}")
-
-    # ==========================================================================
-    # Tab 5: Policy Settings
+    # Tab 5: Policy (merged Inspector + Settings)
     # ==========================================================================
     with tabs[4]:
-        st.subheader("Policy Settings")
-        st.markdown("*Manage policy configuration with full version control*")
+        st.markdown("""
+        <div class="tab-intro">
+            <b>Policy engine configuration.</b> View and manage the fraud detection rules,
+            score thresholds, blocklists/allowlists, and version history with rollback capability.
+        </div>
+        """, unsafe_allow_html=True)
 
-        # Get current policy from API
-        current_policy = get_current_policy()
-        if not current_policy:
-            st.warning("Could not load policy from API. Make sure the API server is running.")
-        else:
-            # Display current version info
-            info_cols = st.columns(4)
-            with info_cols[0]:
-                st.metric("Current Version", current_policy.get("version", "N/A"))
-            with info_cols[1]:
-                st.metric("Last Changed By", current_policy.get("changed_by", "N/A"))
-            with info_cols[2]:
-                created_at = current_policy.get("created_at", "")
-                if created_at:
-                    created_at = created_at[:19].replace("T", " ")
-                st.metric("Last Updated", created_at or "N/A")
-            with info_cols[3]:
-                policy_hash = current_policy.get("policy_hash", "")[:12]
-                st.metric("Policy Hash", policy_hash + "..." if policy_hash else "N/A")
+        # Sub-tabs: Inspect (read-only) and Configure (editable)
+        policy_sub_tabs = st.tabs([
+            "Inspect Policy",
+            "Configure",
+            "Version History",
+        ])
 
-            st.divider()
+        # ==================================================================
+        # Policy Inspect sub-tab (read-only view from YAML)
+        # ==================================================================
+        with policy_sub_tabs[0]:
+            policy_path = os.path.join(os.path.dirname(__file__), "config", "policy.yaml")
 
-            # Sub-tabs for different settings sections
-            settings_tabs = st.tabs([
-                "📊 Thresholds",
-                "📋 Rules",
-                "🚫 Blocklists",
-                "✅ Allowlists",
-                "📜 Version History"
-            ])
+            try:
+                import yaml
+                with open(policy_path, "r") as f:
+                    policy_yaml = yaml.safe_load(f)
 
-            policy_content = current_policy.get("policy", {})
+                # Policy version
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Version", policy_yaml.get("version", "N/A"))
+                with col2:
+                    st.metric("Default Action", policy_yaml.get("default_action", "ALLOW"))
 
-            # ------------------------------------------------------------------
-            # Thresholds Tab
-            # ------------------------------------------------------------------
-            with settings_tabs[0]:
-                st.markdown("### Score Thresholds")
-                st.info("Configure score thresholds for each decision type. Validation: friction < review < block")
-
-                thresholds = policy_content.get("thresholds", {})
-
-                # Create editable form for thresholds
-                with st.form("threshold_form"):
-                    threshold_updates = []
-
-                    for score_type in ["risk", "criminal", "friendly"]:
-                        st.markdown(f"#### {score_type.title()} Score")
-                        thresh = thresholds.get(score_type, {})
-
-                        cols = st.columns(3)
-                        with cols[0]:
-                            friction = st.slider(
-                                f"Friction Threshold",
-                                min_value=0.0,
-                                max_value=1.0,
-                                value=float(thresh.get("friction_threshold", 0.5)),
-                                step=0.05,
-                                key=f"{score_type}_friction",
-                                help="Transactions above this score require additional verification"
-                            )
-                        with cols[1]:
-                            review = st.slider(
-                                f"Review Threshold",
-                                min_value=0.0,
-                                max_value=1.0,
-                                value=float(thresh.get("review_threshold", 0.7)),
-                                step=0.05,
-                                key=f"{score_type}_review",
-                                help="Transactions above this score go to manual review"
-                            )
-                        with cols[2]:
-                            block = st.slider(
-                                f"Block Threshold",
-                                min_value=0.0,
-                                max_value=1.0,
-                                value=float(thresh.get("block_threshold", 0.9)),
-                                step=0.05,
-                                key=f"{score_type}_block",
-                                help="Transactions above this score are blocked"
-                            )
-
-                        # Validation check
-                        if friction >= review or review >= block:
-                            st.error(f"Invalid thresholds for {score_type}: friction ({friction:.2f}) < review ({review:.2f}) < block ({block:.2f})")
-
-                        threshold_updates.append({
-                            "score_type": score_type,
-                            "friction_threshold": friction,
-                            "review_threshold": review,
-                            "block_threshold": block
-                        })
-
-                        st.divider()
-
-                    submit_thresholds = st.form_submit_button("Save Thresholds", type="primary")
-
-                    if submit_thresholds:
-                        # Validate all thresholds
-                        valid = True
-                        for update in threshold_updates:
-                            if update["friction_threshold"] >= update["review_threshold"]:
-                                valid = False
-                            if update["review_threshold"] >= update["block_threshold"]:
-                                valid = False
-
-                        if not valid:
-                            st.error("Invalid thresholds. Ensure friction < review < block for all score types.")
-                        else:
-                            result = update_thresholds(threshold_updates)
-                            if "error" in result:
-                                st.error(f"Failed to update thresholds: {result['error']}")
-                            else:
-                                st.success(f"Thresholds updated! New version: {result.get('version')}")
-                                st.rerun()
-
-            # ------------------------------------------------------------------
-            # Rules Tab
-            # ------------------------------------------------------------------
-            with settings_tabs[1]:
-                st.markdown("### Policy Rules")
-                st.info("Manage fraud detection rules. Rules are evaluated in priority order (lower = higher priority).")
-
-                rules = policy_content.get("rules", [])
-
-                # Display existing rules
-                st.markdown("#### Existing Rules")
-                for rule in sorted(rules, key=lambda r: r.get("priority", 100)):
-                    rule_id = rule.get("id", "unknown")
-                    rule_name = rule.get("name", "Unknown Rule")
-                    rule_enabled = rule.get("enabled", True)
-                    rule_priority = rule.get("priority", 100)
-                    rule_action = rule.get("action", "REVIEW")
-
-                    status_icon = "🟢" if rule_enabled else "🔴"
-
-                    with st.expander(f"{status_icon} **{rule_name}** (Priority: {rule_priority}, Action: {rule_action})"):
-                        st.markdown(f"**ID:** `{rule_id}`")
-                        st.markdown(f"**Description:** {rule.get('description', 'No description')}")
-                        st.markdown(f"**Enabled:** {'Yes' if rule_enabled else 'No'}")
-
-                        if rule.get("friction_type"):
-                            st.markdown(f"**Friction Type:** {rule['friction_type']}")
-                        if rule.get("review_priority"):
-                            st.markdown(f"**Review Priority:** {rule['review_priority']}")
-
-                        st.markdown("**Conditions:**")
-                        st.json(rule.get("conditions", {}))
-
-                        # Delete button
-                        col1, col2, col3 = st.columns([1, 1, 2])
-                        with col1:
-                            if st.button("Delete Rule", key=f"delete_{rule_id}", type="secondary"):
-                                result = delete_policy_rule(rule_id)
-                                if "error" in result:
-                                    st.error(f"Failed to delete rule: {result['error']}")
-                                else:
-                                    st.success(f"Rule deleted! New version: {result.get('version')}")
-                                    st.rerun()
+                st.markdown(f"*{policy_yaml.get('description', '')}*")
 
                 st.divider()
 
-                # Add new rule form
-                st.markdown("#### Add New Rule")
-                with st.form("add_rule_form"):
-                    new_rule_id = st.text_input("Rule ID", value="", placeholder="e.g., high_risk_new_user")
-                    new_rule_name = st.text_input("Rule Name", value="", placeholder="e.g., High Risk New User")
-                    new_rule_description = st.text_area("Description", value="", placeholder="Describe what this rule does")
-                    new_rule_priority = st.number_input("Priority", min_value=1, max_value=1000, value=100)
-                    new_rule_enabled = st.checkbox("Enabled", value=True)
+                # Thresholds as visual cascade bars
+                st.markdown("#### Score Thresholds")
+                inspect_thresholds = policy_yaml.get("thresholds", {})
 
-                    action_col, friction_col = st.columns(2)
-                    with action_col:
-                        new_rule_action = st.selectbox("Action", ["ALLOW", "FRICTION", "REVIEW", "BLOCK"])
-                    with friction_col:
-                        new_friction_type = st.selectbox("Friction Type (if FRICTION)", ["None", "3DS", "OTP", "STEP_UP", "CAPTCHA"])
+                thresh_cols = st.columns(3)
+                for i, (name, thresh) in enumerate(inspect_thresholds.items()):
+                    with thresh_cols[i % 3]:
+                        st.markdown(f"**{name.title()} Score**")
+                        friction_pct = thresh.get('friction_threshold', 0) * 100
+                        review_pct = thresh.get('review_threshold', 0) * 100
+                        block_pct = thresh.get('block_threshold', 0) * 100
 
-                    new_review_priority = st.selectbox("Review Priority (if REVIEW)", ["None", "LOW", "MEDIUM", "HIGH", "URGENT"])
+                        st.markdown(f"""
+                        <div style="background:#0f172a;border-radius:6px;overflow:hidden;height:28px;position:relative;margin:0.5rem 0;">
+                            <div style="position:absolute;left:0;top:0;height:100%;width:{friction_pct}%;background:#10b981;opacity:0.3;"></div>
+                            <div style="position:absolute;left:{friction_pct}%;top:0;height:100%;width:{review_pct - friction_pct}%;background:#f59e0b;opacity:0.3;"></div>
+                            <div style="position:absolute;left:{review_pct}%;top:0;height:100%;width:{block_pct - review_pct}%;background:#f97316;opacity:0.3;"></div>
+                            <div style="position:absolute;left:{block_pct}%;top:0;height:100%;width:{100 - block_pct}%;background:#ef4444;opacity:0.3;"></div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#94a3b8;">
+                            <span style="color:#10b981;">Allow &lt;{friction_pct:.0f}%</span>
+                            <span style="color:#f59e0b;">Friction {friction_pct:.0f}%</span>
+                            <span style="color:#f97316;">Review {review_pct:.0f}%</span>
+                            <span style="color:#ef4444;">Block {block_pct:.0f}%+</span>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-                    st.markdown("**Conditions (JSON)**")
-                    new_conditions = st.text_area(
-                        "Conditions",
-                        value='{\n  "device_is_emulator": true\n}',
-                        height=150,
-                        help="Enter conditions as JSON"
-                    )
+                st.divider()
 
-                    submit_rule = st.form_submit_button("Add Rule", type="primary")
+                # Rules
+                st.markdown("#### Active Rules")
+                inspect_rules = policy_yaml.get("rules", [])
 
-                    if submit_rule:
-                        if not new_rule_id or not new_rule_name:
-                            st.error("Rule ID and Name are required")
-                        else:
-                            try:
-                                conditions = json.loads(new_conditions)
-                                new_rule = {
-                                    "id": new_rule_id,
-                                    "name": new_rule_name,
-                                    "description": new_rule_description,
-                                    "priority": new_rule_priority,
-                                    "enabled": new_rule_enabled,
-                                    "action": new_rule_action,
-                                    "conditions": conditions
-                                }
-                                if new_friction_type != "None":
-                                    new_rule["friction_type"] = new_friction_type
-                                if new_review_priority != "None":
-                                    new_rule["review_priority"] = new_review_priority
+                for rule in inspect_rules:
+                    if rule.get("enabled", True):
+                        with st.expander(f"**{rule.get('name', 'Unknown')}** (Priority: {rule.get('priority', 100)})"):
+                            st.markdown(f"*{rule.get('description', '')}*")
+                            st.markdown(f"**Action:** `{rule.get('action', 'N/A')}`")
+                            if rule.get("friction_type"):
+                                st.markdown(f"**Friction Type:** `{rule['friction_type']}`")
+                            if rule.get("review_priority"):
+                                st.markdown(f"**Review Priority:** `{rule['review_priority']}`")
+                            st.markdown("**Conditions:**")
+                            st.json(rule.get("conditions", {}))
 
-                                result = add_policy_rule(new_rule)
+                st.divider()
+
+                # Lists
+                list_cols = st.columns(2)
+                with list_cols[0]:
+                    st.markdown("#### Blocklists")
+                    st.markdown(f"- Cards: {len(policy_yaml.get('blocklist_cards', []))} entries")
+                    st.markdown(f"- Devices: {len(policy_yaml.get('blocklist_devices', []))} entries")
+                    st.markdown(f"- IPs: {len(policy_yaml.get('blocklist_ips', []))} entries")
+                    st.markdown(f"- Users: {len(policy_yaml.get('blocklist_users', []))} entries")
+
+                with list_cols[1]:
+                    st.markdown("#### Allowlists")
+                    st.markdown(f"- Cards: {len(policy_yaml.get('allowlist_cards', []))} entries")
+                    st.markdown(f"- Users: {len(policy_yaml.get('allowlist_users', []))} entries")
+                    st.markdown(f"- Services: {len(policy_yaml.get('allowlist_services', []))} entries")
+
+                # Raw YAML
+                with st.expander("Raw Policy YAML"):
+                    st.code(yaml.dump(policy_yaml, default_flow_style=False), language="yaml")
+
+            except Exception as e:
+                st.error(f"Could not load policy: {e}")
+
+        # ==================================================================
+        # Configure sub-tab (editable settings via API)
+        # ==================================================================
+        with policy_sub_tabs[1]:
+            # Get current policy from API
+            current_policy = get_current_policy()
+            if not current_policy:
+                st.warning("Could not load policy from API. Make sure the API server is running.")
+            else:
+                # Display current version info
+                info_cols = st.columns(4)
+                with info_cols[0]:
+                    st.metric("Current Version", current_policy.get("version", "N/A"))
+                with info_cols[1]:
+                    st.metric("Last Changed By", current_policy.get("changed_by", "N/A"))
+                with info_cols[2]:
+                    created_at = current_policy.get("created_at", "")
+                    if created_at:
+                        created_at = created_at[:19].replace("T", " ")
+                    st.metric("Last Updated", created_at or "N/A")
+                with info_cols[3]:
+                    policy_hash = current_policy.get("policy_hash", "")[:12]
+                    st.metric("Policy Hash", policy_hash + "..." if policy_hash else "N/A")
+
+                st.divider()
+
+                # Settings sub-tabs within Configure
+                settings_tabs = st.tabs([
+                    "Thresholds",
+                    "Rules",
+                    "Blocklists",
+                    "Allowlists",
+                ])
+
+                policy_content = current_policy.get("policy", {})
+
+                # ----------------------------------------------------------
+                # Thresholds
+                # ----------------------------------------------------------
+                with settings_tabs[0]:
+                    st.markdown("#### Score Thresholds")
+                    st.caption("Configure score thresholds for each decision type. Validation: friction < review < block")
+
+                    config_thresholds = policy_content.get("thresholds", {})
+
+                    with st.form("threshold_form"):
+                        threshold_updates = []
+
+                        for score_type in ["risk", "criminal", "friendly"]:
+                            st.markdown(f"**{score_type.title()} Score**")
+                            thresh = config_thresholds.get(score_type, {})
+
+                            cols = st.columns(3)
+                            with cols[0]:
+                                friction = st.slider(
+                                    f"Friction Threshold",
+                                    min_value=0.0, max_value=1.0,
+                                    value=float(thresh.get("friction_threshold", 0.5)),
+                                    step=0.05, key=f"{score_type}_friction",
+                                    help="Transactions above this score require additional verification"
+                                )
+                            with cols[1]:
+                                review = st.slider(
+                                    f"Review Threshold",
+                                    min_value=0.0, max_value=1.0,
+                                    value=float(thresh.get("review_threshold", 0.7)),
+                                    step=0.05, key=f"{score_type}_review",
+                                    help="Transactions above this score go to manual review"
+                                )
+                            with cols[2]:
+                                block = st.slider(
+                                    f"Block Threshold",
+                                    min_value=0.0, max_value=1.0,
+                                    value=float(thresh.get("block_threshold", 0.9)),
+                                    step=0.05, key=f"{score_type}_block",
+                                    help="Transactions above this score are blocked"
+                                )
+
+                            if friction >= review or review >= block:
+                                st.error(f"Invalid: friction ({friction:.2f}) < review ({review:.2f}) < block ({block:.2f})")
+
+                            threshold_updates.append({
+                                "score_type": score_type,
+                                "friction_threshold": friction,
+                                "review_threshold": review,
+                                "block_threshold": block
+                            })
+
+                            st.divider()
+
+                        submit_thresholds = st.form_submit_button("Save Thresholds", type="primary")
+
+                        if submit_thresholds:
+                            valid = True
+                            for update in threshold_updates:
+                                if update["friction_threshold"] >= update["review_threshold"]:
+                                    valid = False
+                                if update["review_threshold"] >= update["block_threshold"]:
+                                    valid = False
+
+                            if not valid:
+                                st.error("Invalid thresholds. Ensure friction < review < block for all score types.")
+                            else:
+                                result = update_thresholds(threshold_updates)
                                 if "error" in result:
-                                    st.error(f"Failed to add rule: {result['error']}")
+                                    st.error(f"Failed to update thresholds: {result['error']}")
                                 else:
-                                    st.success(f"Rule added! New version: {result.get('version')}")
-                                    st.rerun()
-                            except json.JSONDecodeError as e:
-                                st.error(f"Invalid JSON in conditions: {e}")
-
-            # ------------------------------------------------------------------
-            # Blocklists Tab
-            # ------------------------------------------------------------------
-            with settings_tabs[2]:
-                st.markdown("### Blocklists")
-                st.info("Manage blocked entities. Transactions matching blocklisted items are automatically blocked.")
-
-                blocklist_types = {
-                    "blocklist_cards": "Card Tokens",
-                    "blocklist_devices": "Device IDs",
-                    "blocklist_ips": "IP Addresses",
-                    "blocklist_users": "User IDs"
-                }
-
-                for list_type, display_name in blocklist_types.items():
-                    st.markdown(f"#### {display_name}")
-
-                    items = policy_content.get(list_type, [])
-
-                    if items:
-                        # Display as chips/tags
-                        cols = st.columns(6)
-                        for i, item in enumerate(items):
-                            with cols[i % 6]:
-                                col1, col2 = st.columns([3, 1])
-                                with col1:
-                                    st.code(item[:20] + "..." if len(item) > 20 else item)
-                                with col2:
-                                    if st.button("X", key=f"remove_{list_type}_{i}", help="Remove"):
-                                        result = remove_from_policy_list(list_type, item)
-                                        if "error" not in result:
-                                            st.rerun()
-                    else:
-                        st.markdown("*No items in this list*")
-
-                    # Add new item
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        new_value = st.text_input(
-                            f"Add to {display_name}",
-                            key=f"add_{list_type}",
-                            placeholder=f"Enter {display_name.lower()[:-1]} to block"
-                        )
-                    with col2:
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        if st.button("Add", key=f"add_btn_{list_type}", type="primary"):
-                            if new_value:
-                                result = add_to_policy_list(list_type, new_value)
-                                if "error" in result:
-                                    st.error(f"Failed to add: {result['error']}")
-                                else:
-                                    st.success(f"Added! New version: {result.get('version')}")
+                                    st.success(f"Thresholds updated! New version: {result.get('version')}")
                                     st.rerun()
 
-                    st.divider()
+                # ----------------------------------------------------------
+                # Rules
+                # ----------------------------------------------------------
+                with settings_tabs[1]:
+                    st.markdown("#### Policy Rules")
+                    st.caption("Rules are evaluated in priority order (lower number = higher priority).")
 
-            # ------------------------------------------------------------------
-            # Allowlists Tab
-            # ------------------------------------------------------------------
-            with settings_tabs[3]:
-                st.markdown("### Allowlists")
-                st.info("Manage allowed entities. Transactions matching allowlisted items skip fraud checks.")
+                    config_rules = policy_content.get("rules", [])
 
-                allowlist_types = {
-                    "allowlist_cards": "Card Tokens",
-                    "allowlist_users": "User IDs",
-                    "allowlist_services": "Service IDs"
-                }
+                    for rule in sorted(config_rules, key=lambda r: r.get("priority", 100)):
+                        rule_id = rule.get("id", "unknown")
+                        rule_name = rule.get("name", "Unknown Rule")
+                        rule_enabled = rule.get("enabled", True)
+                        rule_priority = rule.get("priority", 100)
+                        rule_action = rule.get("action", "REVIEW")
 
-                for list_type, display_name in allowlist_types.items():
-                    st.markdown(f"#### {display_name}")
+                        status_icon = "🟢" if rule_enabled else "🔴"
 
-                    items = policy_content.get(list_type, [])
+                        with st.expander(f"{status_icon} **{rule_name}** (Priority: {rule_priority}, Action: {rule_action})"):
+                            st.markdown(f"**ID:** `{rule_id}`")
+                            st.markdown(f"**Description:** {rule.get('description', 'No description')}")
+                            st.markdown(f"**Enabled:** {'Yes' if rule_enabled else 'No'}")
 
-                    if items:
-                        cols = st.columns(6)
-                        for i, item in enumerate(items):
-                            with cols[i % 6]:
-                                col1, col2 = st.columns([3, 1])
-                                with col1:
-                                    st.code(item[:20] + "..." if len(item) > 20 else item)
-                                with col2:
-                                    if st.button("X", key=f"remove_{list_type}_{i}", help="Remove"):
-                                        result = remove_from_policy_list(list_type, item)
-                                        if "error" not in result:
-                                            st.rerun()
-                    else:
-                        st.markdown("*No items in this list*")
+                            if rule.get("friction_type"):
+                                st.markdown(f"**Friction Type:** {rule['friction_type']}")
+                            if rule.get("review_priority"):
+                                st.markdown(f"**Review Priority:** {rule['review_priority']}")
 
-                    # Add new item
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        new_value = st.text_input(
-                            f"Add to {display_name}",
-                            key=f"add_{list_type}",
-                            placeholder=f"Enter {display_name.lower()[:-1]} to allow"
-                        )
-                    with col2:
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        if st.button("Add", key=f"add_btn_{list_type}", type="primary"):
-                            if new_value:
-                                result = add_to_policy_list(list_type, new_value)
-                                if "error" in result:
-                                    st.error(f"Failed to add: {result['error']}")
-                                else:
-                                    st.success(f"Added! New version: {result.get('version')}")
-                                    st.rerun()
+                            st.markdown("**Conditions:**")
+                            st.json(rule.get("conditions", {}))
 
-                    st.divider()
-
-            # ------------------------------------------------------------------
-            # Version History Tab
-            # ------------------------------------------------------------------
-            with settings_tabs[4]:
-                st.markdown("### Version History")
-                st.info("View policy change history and rollback to previous versions if needed.")
-
-                versions = get_policy_versions(limit=50)
-
-                if versions:
-                    # Version history table
-                    for v in versions:
-                        is_active = v.get("is_active", False)
-                        version = v.get("version", "N/A")
-                        change_type = v.get("change_type", "N/A")
-                        change_summary = v.get("change_summary", "")
-                        changed_by = v.get("changed_by", "N/A")
-                        created_at = v.get("created_at", "")[:19].replace("T", " ")
-
-                        # Active version badge
-                        active_badge = "🟢 **ACTIVE**" if is_active else ""
-
-                        with st.expander(f"**v{version}** - {change_type} {active_badge}"):
-                            st.markdown(f"**Change Summary:** {change_summary}")
-                            st.markdown(f"**Changed By:** {changed_by}")
-                            st.markdown(f"**Created At:** {created_at}")
-
-                            if not is_active:
-                                if st.button(f"Rollback to v{version}", key=f"rollback_{version}", type="secondary"):
-                                    result = rollback_policy(version)
+                            col1, col2, col3 = st.columns([1, 1, 2])
+                            with col1:
+                                if st.button("Delete Rule", key=f"delete_{rule_id}", type="secondary"):
+                                    result = delete_policy_rule(rule_id)
                                     if "error" in result:
-                                        st.error(f"Rollback failed: {result['error']}")
+                                        st.error(f"Failed to delete rule: {result['error']}")
                                     else:
-                                        st.success(f"Rolled back to v{version}! New version: {result.get('version')}")
+                                        st.success(f"Rule deleted! New version: {result.get('version')}")
                                         st.rerun()
-                else:
-                    st.info("No version history available")
+
+                    st.divider()
+
+                    # Add new rule form
+                    st.markdown("#### Add New Rule")
+                    with st.form("add_rule_form"):
+                        new_rule_id = st.text_input("Rule ID", value="", placeholder="e.g., high_risk_new_user")
+                        new_rule_name = st.text_input("Rule Name", value="", placeholder="e.g., High Risk New User")
+                        new_rule_description = st.text_area("Description", value="", placeholder="Describe what this rule does")
+                        new_rule_priority = st.number_input("Priority", min_value=1, max_value=1000, value=100)
+                        new_rule_enabled = st.checkbox("Enabled", value=True)
+
+                        action_col, friction_col = st.columns(2)
+                        with action_col:
+                            new_rule_action = st.selectbox("Action", ["ALLOW", "FRICTION", "REVIEW", "BLOCK"])
+                        with friction_col:
+                            new_friction_type = st.selectbox("Friction Type (if FRICTION)", ["None", "3DS", "OTP", "STEP_UP", "CAPTCHA"])
+
+                        new_review_priority = st.selectbox("Review Priority (if REVIEW)", ["None", "LOW", "MEDIUM", "HIGH", "URGENT"])
+
+                        st.markdown("**Conditions (JSON)**")
+                        new_conditions = st.text_area(
+                            "Conditions",
+                            value='{\n  "device_is_emulator": true\n}',
+                            height=150,
+                            help="Enter conditions as JSON"
+                        )
+
+                        submit_rule = st.form_submit_button("Add Rule", type="primary")
+
+                        if submit_rule:
+                            if not new_rule_id or not new_rule_name:
+                                st.error("Rule ID and Name are required")
+                            else:
+                                try:
+                                    conditions = json.loads(new_conditions)
+                                    new_rule = {
+                                        "id": new_rule_id,
+                                        "name": new_rule_name,
+                                        "description": new_rule_description,
+                                        "priority": new_rule_priority,
+                                        "enabled": new_rule_enabled,
+                                        "action": new_rule_action,
+                                        "conditions": conditions
+                                    }
+                                    if new_friction_type != "None":
+                                        new_rule["friction_type"] = new_friction_type
+                                    if new_review_priority != "None":
+                                        new_rule["review_priority"] = new_review_priority
+
+                                    result = add_policy_rule(new_rule)
+                                    if "error" in result:
+                                        st.error(f"Failed to add rule: {result['error']}")
+                                    else:
+                                        st.success(f"Rule added! New version: {result.get('version')}")
+                                        st.rerun()
+                                except json.JSONDecodeError as e:
+                                    st.error(f"Invalid JSON in conditions: {e}")
+
+                # ----------------------------------------------------------
+                # Blocklists
+                # ----------------------------------------------------------
+                with settings_tabs[2]:
+                    st.markdown("#### Blocklists")
+                    st.caption("Transactions matching blocklisted items are automatically blocked.")
+
+                    blocklist_types = {
+                        "blocklist_cards": "Card Tokens",
+                        "blocklist_devices": "Device IDs",
+                        "blocklist_ips": "IP Addresses",
+                        "blocklist_users": "User IDs"
+                    }
+
+                    for list_type, display_name in blocklist_types.items():
+                        st.markdown(f"**{display_name}**")
+                        items = policy_content.get(list_type, [])
+
+                        if items:
+                            cols = st.columns(6)
+                            for i, item in enumerate(items):
+                                with cols[i % 6]:
+                                    col1, col2 = st.columns([3, 1])
+                                    with col1:
+                                        st.code(item[:20] + "..." if len(item) > 20 else item)
+                                    with col2:
+                                        if st.button("X", key=f"remove_{list_type}_{i}", help="Remove"):
+                                            result = remove_from_policy_list(list_type, item)
+                                            if "error" not in result:
+                                                st.rerun()
+                        else:
+                            st.markdown("*No items in this list*")
+
+                        col1, col2 = st.columns([3, 1])
+                        with col1:
+                            new_value = st.text_input(
+                                f"Add to {display_name}",
+                                key=f"add_{list_type}",
+                                placeholder=f"Enter {display_name.lower()[:-1]} to block"
+                            )
+                        with col2:
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            if st.button("Add", key=f"add_btn_{list_type}", type="primary"):
+                                if new_value:
+                                    result = add_to_policy_list(list_type, new_value)
+                                    if "error" in result:
+                                        st.error(f"Failed to add: {result['error']}")
+                                    else:
+                                        st.success(f"Added! New version: {result.get('version')}")
+                                        st.rerun()
+                        st.divider()
+
+                # ----------------------------------------------------------
+                # Allowlists
+                # ----------------------------------------------------------
+                with settings_tabs[3]:
+                    st.markdown("#### Allowlists")
+                    st.caption("Transactions matching allowlisted items skip fraud checks.")
+
+                    allowlist_types = {
+                        "allowlist_cards": "Card Tokens",
+                        "allowlist_users": "User IDs",
+                        "allowlist_services": "Service IDs"
+                    }
+
+                    for list_type, display_name in allowlist_types.items():
+                        st.markdown(f"**{display_name}**")
+                        items = policy_content.get(list_type, [])
+
+                        if items:
+                            cols = st.columns(6)
+                            for i, item in enumerate(items):
+                                with cols[i % 6]:
+                                    col1, col2 = st.columns([3, 1])
+                                    with col1:
+                                        st.code(item[:20] + "..." if len(item) > 20 else item)
+                                    with col2:
+                                        if st.button("X", key=f"remove_{list_type}_{i}", help="Remove"):
+                                            result = remove_from_policy_list(list_type, item)
+                                            if "error" not in result:
+                                                st.rerun()
+                        else:
+                            st.markdown("*No items in this list*")
+
+                        col1, col2 = st.columns([3, 1])
+                        with col1:
+                            new_value = st.text_input(
+                                f"Add to {display_name}",
+                                key=f"add_{list_type}",
+                                placeholder=f"Enter {display_name.lower()[:-1]} to allow"
+                            )
+                        with col2:
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            if st.button("Add", key=f"add_btn_{list_type}", type="primary"):
+                                if new_value:
+                                    result = add_to_policy_list(list_type, new_value)
+                                    if "error" in result:
+                                        st.error(f"Failed to add: {result['error']}")
+                                    else:
+                                        st.success(f"Added! New version: {result.get('version')}")
+                                        st.rerun()
+                        st.divider()
+
+        # ==================================================================
+        # Version History sub-tab
+        # ==================================================================
+        with policy_sub_tabs[2]:
+            st.caption("View policy change history and rollback to previous versions if needed.")
+
+            versions = get_policy_versions(limit=50)
+
+            if versions:
+                for v in versions:
+                    is_active = v.get("is_active", False)
+                    version = v.get("version", "N/A")
+                    change_type = v.get("change_type", "N/A")
+                    change_summary = v.get("change_summary", "")
+                    changed_by = v.get("changed_by", "N/A")
+                    created_at = v.get("created_at", "")[:19].replace("T", " ")
+
+                    active_badge = "🟢 **ACTIVE**" if is_active else ""
+
+                    with st.expander(f"**v{version}** - {change_type} {active_badge}"):
+                        st.markdown(f"**Change Summary:** {change_summary}")
+                        st.markdown(f"**Changed By:** {changed_by}")
+                        st.markdown(f"**Created At:** {created_at}")
+
+                        if not is_active:
+                            if st.button(f"Rollback to v{version}", key=f"rollback_{version}", type="secondary"):
+                                result = rollback_policy(version)
+                                if "error" in result:
+                                    st.error(f"Rollback failed: {result['error']}")
+                                else:
+                                    st.success(f"Rolled back to v{version}! New version: {result.get('version')}")
+                                    st.rerun()
+            else:
+                st.info("No version history available")
 
 
 if __name__ == "__main__":

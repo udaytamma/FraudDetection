@@ -171,48 +171,7 @@ st.markdown("""
         line-height: 1.5;
     }
 
-    /* Quick Guide popup */
-    .quick-guide-overlay {
-        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0,0,0,0.6); z-index: 9998;
-        backdrop-filter: blur(4px);
-    }
-    .quick-guide {
-        background: #0f172a; border: 1px solid #334155;
-        border-radius: 16px; padding: 2rem; max-width: 640px;
-        margin: 0 auto; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-        color: #e2e8f0;
-    }
-    .quick-guide h3 {
-        margin: 0 0 0.25rem 0; font-size: 1.25rem; color: white;
-    }
-    .quick-guide .guide-subtitle {
-        color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem;
-    }
-    .guide-activity {
-        background: #1e293b; border: 1px solid #334155;
-        border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem;
-        transition: border-color 0.2s;
-    }
-    .guide-activity:hover { border-color: #3b82f6; }
-    .guide-activity-number {
-        background: #3b82f6; color: white; width: 28px; height: 28px;
-        border-radius: 50%; display: inline-flex; align-items: center;
-        justify-content: center; font-weight: 700; font-size: 0.85rem;
-        margin-right: 0.75rem; flex-shrink: 0;
-    }
-    .guide-activity h4 {
-        margin: 0 0 0.5rem 0; color: white; font-size: 1rem;
-        display: flex; align-items: center;
-    }
-    .guide-step {
-        display: flex; align-items: flex-start; gap: 0.5rem;
-        margin: 0.35rem 0; padding-left: 2.75rem;
-        font-size: 0.85rem; color: #cbd5e1;
-    }
-    .guide-step-marker {
-        color: #3b82f6; font-weight: 600; flex-shrink: 0;
-    }
+    /* Quick Guide styles are inline via st.html() -- no global CSS needed */
 
     /* Metric box */
     .metric-box {
@@ -1081,35 +1040,92 @@ def main():
             st.session_state.show_guide = not st.session_state.show_guide
 
     if st.session_state.show_guide:
-        st.markdown("""
-        <div class="quick-guide">
+        st.html("""
+        <style>
+            .qg-box {
+                background: #0f172a;
+                border: 1px solid #334155;
+                border-radius: 12px;
+                padding: 1.5rem 2rem;
+                margin-bottom: 1rem;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                color: #e2e8f0;
+            }
+            .qg-box h3 {
+                margin: 0 0 0.25rem 0;
+                font-size: 1.15rem;
+                color: #f1f5f9;
+            }
+            .qg-subtitle {
+                color: #94a3b8;
+                font-size: 0.9rem;
+                margin: 0 0 1.25rem 0;
+            }
+            .qg-activity {
+                background: #1e293b;
+                border: 1px solid #334155;
+                border-radius: 8px;
+                padding: 1rem 1.25rem;
+                margin-bottom: 0.75rem;
+                transition: border-color 0.2s;
+            }
+            .qg-activity:hover { border-color: #3b82f6; }
+            .qg-activity h4 {
+                margin: 0 0 0.5rem 0;
+                font-size: 0.95rem;
+                color: #f1f5f9;
+            }
+            .qg-num {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 22px;
+                height: 22px;
+                background: #3b82f6;
+                color: white;
+                border-radius: 50%;
+                font-size: 0.75rem;
+                font-weight: 700;
+                margin-right: 0.5rem;
+            }
+            .qg-step {
+                padding: 0.2rem 0 0.2rem 2.25rem;
+                font-size: 0.85rem;
+                color: #cbd5e1;
+            }
+            .qg-marker {
+                color: #64748b;
+                margin-right: 0.4rem;
+                font-weight: 600;
+            }
+        </style>
+        <div class="qg-box">
             <h3>Quick Guide</h3>
-            <p class="guide-subtitle">Three things you can do on this dashboard right now:</p>
+            <p class="qg-subtitle">Three things you can do on this dashboard right now:</p>
 
-            <div class="guide-activity">
-                <h4><span class="guide-activity-number">1</span> Run a Fraud Simulation</h4>
-                <div class="guide-step"><span class="guide-step-marker">a.</span> Go to the <b>Simulate</b> tab</div>
-                <div class="guide-step"><span class="guide-step-marker">b.</span> Pick a preset scenario (e.g. "SIM Swap Fraud" or "Normal Activation")</div>
-                <div class="guide-step"><span class="guide-step-marker">c.</span> Click <b>Submit Transaction</b> and watch the real-time decision</div>
-                <div class="guide-step"><span class="guide-step-marker">d.</span> Review the risk scores, triggered rules, and latency metrics</div>
+            <div class="qg-activity">
+                <h4><span class="qg-num">1</span> Run a Fraud Simulation</h4>
+                <div class="qg-step"><span class="qg-marker">a.</span> Go to the <b>Simulate</b> tab</div>
+                <div class="qg-step"><span class="qg-marker">b.</span> Pick a preset scenario (e.g. "SIM Swap Fraud" or "Normal Activation")</div>
+                <div class="qg-step"><span class="qg-marker">c.</span> Click <b>Submit Transaction</b> and watch the real-time decision</div>
+                <div class="qg-step"><span class="qg-marker">d.</span> Review the risk scores, triggered rules, and latency metrics</div>
             </div>
 
-            <div class="guide-activity">
-                <h4><span class="guide-activity-number">2</span> Review Detection Analytics</h4>
-                <div class="guide-step"><span class="guide-step-marker">a.</span> Go to the <b>Overview</b> tab after running a few simulations</div>
-                <div class="guide-step"><span class="guide-step-marker">b.</span> Check decision distribution (Allow vs Block vs Friction vs Review)</div>
-                <div class="guide-step"><span class="guide-step-marker">c.</span> Monitor latency vs the 200ms SLO target</div>
+            <div class="qg-activity">
+                <h4><span class="qg-num">2</span> Review Detection Analytics</h4>
+                <div class="qg-step"><span class="qg-marker">a.</span> Go to the <b>Overview</b> tab after running a few simulations</div>
+                <div class="qg-step"><span class="qg-marker">b.</span> Check decision distribution (Allow vs Block vs Friction vs Review)</div>
+                <div class="qg-step"><span class="qg-marker">c.</span> Monitor latency vs the 200ms SLO target</div>
             </div>
 
-            <div class="guide-activity">
-                <h4><span class="guide-activity-number">3</span> Inspect the Policy Engine</h4>
-                <div class="guide-step"><span class="guide-step-marker">a.</span> Go to the <b>Policy</b> tab</div>
-                <div class="guide-step"><span class="guide-step-marker">b.</span> View score thresholds that control Allow/Friction/Review/Block decisions</div>
-                <div class="guide-step"><span class="guide-step-marker">c.</span> Explore active rules, blocklists, and version history with rollback</div>
+            <div class="qg-activity">
+                <h4><span class="qg-num">3</span> Inspect the Policy Engine</h4>
+                <div class="qg-step"><span class="qg-marker">a.</span> Go to the <b>Policy</b> tab</div>
+                <div class="qg-step"><span class="qg-marker">b.</span> View score thresholds that control Allow/Friction/Review/Block decisions</div>
+                <div class="qg-step"><span class="qg-marker">c.</span> Explore active rules, blocklists, and version history with rollback</div>
             </div>
         </div>
-        """, unsafe_allow_html=True)
-        st.markdown("")
+        """)
 
     # Sidebar - System Status (compact, professional)
     with st.sidebar:

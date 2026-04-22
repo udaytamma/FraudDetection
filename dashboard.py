@@ -259,8 +259,16 @@ st.markdown("""
 # Helper Functions
 # ============================================================================
 
+# Read-only API endpoints are cached with short TTLs so that every Streamlit
+# rerun (which fires on ANY interaction) does not re-hit the backend API.
+# Without caching, each tab switch, button click, or form submit issued 4+
+# HTTP calls to the API -- on Railway's serverless billing this kept the
+# API container warm indefinitely and drove up memory costs. Cache busts
+# happen explicitly after mutations (thresholds, rules, blocklist, reload).
+
+@st.cache_data(ttl=30, show_spinner=False)
 def get_api_health() -> dict:
-    """Check API health status."""
+    """Check API health status. Cached for 30s to avoid polling on every rerun."""
     try:
         response = httpx.get(f"{API_URL}/health", headers=_api_headers(), timeout=5.0)
         if response.status_code == 200:
@@ -270,8 +278,9 @@ def get_api_health() -> dict:
     return {"status": "down", "components": {"redis": False, "postgres": False, "policy": False}}
 
 
+@st.cache_data(ttl=60, show_spinner=False)
 def get_policy_version() -> dict:
-    """Get current policy version."""
+    """Get current policy version. Cached for 60s -- rarely changes."""
     try:
         response = httpx.get(f"{API_URL}/policy/version", headers=_api_headers(), timeout=5.0)
         if response.status_code == 200:
@@ -281,8 +290,9 @@ def get_policy_version() -> dict:
     return {"version": "N/A", "hash": "N/A"}
 
 
+@st.cache_data(ttl=60, show_spinner=False)
 def get_current_policy() -> dict:
-    """Get current active policy configuration."""
+    """Get current active policy configuration. Cached for 60s."""
     try:
         response = httpx.get(f"{API_URL}/policy", headers=_api_headers(), timeout=5.0)
         if response.status_code == 200:
@@ -292,8 +302,9 @@ def get_current_policy() -> dict:
     return {}
 
 
+@st.cache_data(ttl=30, show_spinner=False)
 def get_policy_versions(limit: int = 50) -> list:
-    """Get policy version history."""
+    """Get policy version history. Cached for 30s."""
     try:
         response = httpx.get(f"{API_URL}/policy/versions", params={"limit": limit}, headers=_api_headers(), timeout=5.0)
         if response.status_code == 200:
@@ -301,6 +312,15 @@ def get_policy_versions(limit: int = 50) -> list:
     except Exception:
         pass
     return []
+
+
+def _invalidate_policy_caches() -> None:
+    """Clear cached policy data after a mutation. Call after any policy update
+    (threshold edit, rule add/remove, blocklist change, policy reload)."""
+    get_api_health.clear()
+    get_policy_version.clear()
+    get_current_policy.clear()
+    get_policy_versions.clear()
 
 
 def update_thresholds(updates: list, changed_by: str = "dashboard") -> dict:
@@ -313,6 +333,7 @@ def update_thresholds(updates: list, changed_by: str = "dashboard") -> dict:
             headers=_api_headers(),
             timeout=10.0
         )
+        _invalidate_policy_caches()
         return response.json()
     except Exception as e:
         return {"error": str(e)}
@@ -328,6 +349,7 @@ def add_policy_rule(rule: dict, changed_by: str = "dashboard") -> dict:
             headers=_api_headers(),
             timeout=10.0
         )
+        _invalidate_policy_caches()
         return response.json()
     except Exception as e:
         return {"error": str(e)}
@@ -343,6 +365,7 @@ def update_policy_rule(rule_id: str, rule: dict, changed_by: str = "dashboard") 
             headers=_api_headers(),
             timeout=10.0
         )
+        _invalidate_policy_caches()
         return response.json()
     except Exception as e:
         return {"error": str(e)}
@@ -357,6 +380,7 @@ def delete_policy_rule(rule_id: str, changed_by: str = "dashboard") -> dict:
             headers=_api_headers(),
             timeout=10.0
         )
+        _invalidate_policy_caches()
         return response.json()
     except Exception as e:
         return {"error": str(e)}
@@ -371,6 +395,7 @@ def add_to_policy_list(list_type: str, value: str, changed_by: str = "dashboard"
             headers=_api_headers(),
             timeout=10.0
         )
+        _invalidate_policy_caches()
         return response.json()
     except Exception as e:
         return {"error": str(e)}
@@ -385,6 +410,7 @@ def remove_from_policy_list(list_type: str, value: str, changed_by: str = "dashb
             headers=_api_headers(),
             timeout=10.0
         )
+        _invalidate_policy_caches()
         return response.json()
     except Exception as e:
         return {"error": str(e)}
@@ -399,6 +425,7 @@ def rollback_policy(target_version: str, changed_by: str = "dashboard") -> dict:
             headers=_api_headers(),
             timeout=10.0
         )
+        _invalidate_policy_caches()
         return response.json()
     except Exception as e:
         return {"error": str(e)}
